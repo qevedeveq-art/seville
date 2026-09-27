@@ -260,3 +260,60 @@ const TODO = [
   { id: "t7", text: "Setas de Sevilla — billet coucher de soleil jeudi (facultatif)", url: null },
   { id: "t8", text: "Retirer un peu d’espèces (marché du jeudi, petits bars)", url: null }
 ];
+
+/* ---------------- CONNEXION À LA BASE PARTAGÉE ----------------
+   Clé publique (publishable) : sans le code de groupe, elle ne donne
+   accès à rien. Le code n'est JAMAIS stocké dans ce dépôt. */
+const BACKEND = {
+  url: "https://qkpswqiqytlsdwsuxmkg.supabase.co",
+  key: "sb_publishable_aYy-pIs3DVA93hzVKWbsWw_wsAXCh4I"
+};
+
+/* ---------------- CONSEILS DU JOUR & PLANS B ---------------- */
+const DAY_TIPS = {
+  mer: {
+    conseils: [
+      "Garder un petit sac cabine avec de quoi se changer : on dîne dehors dès l’arrivée.",
+      "Retirer ~100 € d’espèces à un distributeur de banque (éviter les Euronet jaunes, frais élevés)."
+    ],
+    planB: [
+      "Vol en retard après 23h : bocadillo et caña dans un bar encore ouvert de l’Alameda, dîner vrai demain.",
+      "Envie d’un vrai repas : Bodega Dos de Mayo (plaza de la Gavidia), cuisine jusqu’à tard."
+    ]
+  },
+  jeu: {
+    conseils: [
+      "El Jueves est meilleur tôt : les marchands remballent dès 13h–14h.",
+      "Le jeudi, beaucoup de Sévillans sortent déjà : réserver Eslava n’est pas optionnel.",
+      "Chaussures confortables : pavés partout, on marche 12–15 km par jour."
+    ],
+    planB: [
+      "Pluie : Museo de Bellas Artes (grands Murillo et Zurbarán) à 15 min à pied.",
+      "Peña complète ou pas d’ambiance : La Carbonería (Santa Cruz), flamenco libre vers 22h30.",
+      "Eslava plein : Casa Ricardo (croquetas) à 3 min, ou Bar Yebra côté Macarena."
+    ]
+  },
+  ven: {
+    conseils: [
+      "Alcázar : se présenter 15 min avant le créneau, contrôle de sécurité type aéroport.",
+      "Noche en Blanco : télécharger/imprimer les confirmations de réservation, prévoir une batterie externe.",
+      "Grosse journée : siesta de 16h à 18h, sinon la soirée sera difficile."
+    ],
+    planB: [
+      "Alcázar complet : Casa de Pilatos le matin et Alcázar reporté samedi 9h30.",
+      "Trop de monde à la Noche en Blanco : se replier sur le quartier San Lorenzo / Alameda, plus local.",
+      "Faim à 1h du matin : montaditos sur l’Alameda."
+    ]
+  },
+  sam: {
+    conseils: [
+      "Bagages : demander à l’hôte un late check-out ou une consigne (sinon consignes près de Plaza de Armas).",
+      "Samedi midi = sortie des familles sévillanes : terrasses pleines, réserver ou arriver avant 13h30.",
+      "Fermer la boucle : acheter huile d’olive, fino ou manzanilla en rama, turrón ou tortas de aceite à ramener."
+    ],
+    planB: [
+      "Sobretablas complet : bar de tapas de qualité à Triana (El Mercader) puis Plaza de España.",
+      "Vol tôt : Cathédrale puis Triana directement, Plaza de España en taxi rapide."
+    ]
+  }
+};

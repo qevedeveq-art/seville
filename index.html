@@ -32,6 +32,19 @@
   </nav>
 
   <main>
+    <section id="login" class="card login" hidden>
+      <h2>Qui êtes-vous ?</h2>
+      <p class="muted">Entrez votre prénom et le code du groupe pour proposer, modifier, réagir et commenter. À faire une seule fois par téléphone.</p>
+      <form id="loginForm">
+        <input id="loginName" placeholder="Prénom" maxlength="30" autocomplete="given-name" required>
+        <input id="loginCode" placeholder="Code du groupe" autocomplete="off" autocapitalize="none" spellcheck="false" required>
+        <button class="btn">Entrer</button>
+      </form>
+    </section>
+    <div class="who-bar"><div id="who"></div><span id="syncInfo" class="muted small"></span></div>
+
+    <section id="feed" class="card feed" hidden></section>
+
     <section id="reserver" class="card todo">
       <h2>À réserver avant de partir</h2>
       <p class="muted">Cochez au fur et à mesure (mémorisé sur cet appareil).</p>
@@ -128,9 +141,94 @@
             <li>Acheter uniquement sur les sites officiels (beaucoup de revendeurs majorés).</li>
           </ul>
         </article>
+
+        <article class="card">
+          <h3>🥘 Bien manger : nos règles</h3>
+          <ul>
+            <li>Le <em>tapeo</em> se fait en mouvement : 2–3 tapas + un verre, puis on change de bar. 3 ou 4 bars par soirée.</li>
+            <li>Au comptoir, on commande à voix haute et l’addition se fait à la fin (parfois à la craie).</li>
+            <li>À goûter absolument : salmorejo, espinacas con garbanzos, pringá, carrillada, boquerones en adobo, papas aliñás, chicharrones, presa ibérica.</li>
+            <li>Les tapas de la semaine sont souvent des plats du jour : demander « ¿qué hay fuera de carta? ».</li>
+            <li>Dessert : torrijas ou tocino de cielo ; biscuits des couvents achetés au tour du couvent San Leandro.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h3>🍷 Bien boire</h3>
+          <ul>
+            <li>À l’apéro : fino ou manzanilla bien frais ; au dîner : amontillado ou palo cortado avec la viande.</li>
+            <li>Bière locale : Cruzcampo (en caña) partout ; pour changer, demandez une « Alhambra ».</li>
+            <li>Vins andalous rouges : Sierra de Cádiz, Ronda ; blancs : Aljarafe, vins de sable de Cádiz.</li>
+            <li>Digestif : un Pedro Ximénez avec le dessert.</li>
+            <li>Tinto de verano plutôt que sangria : c’est ce que boivent les Sévillans.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h3>🛡 Sécurité & santé</h3>
+          <ul>
+            <li>Ville sûre, mais pickpockets autour de la Cathédrale, de l’Alcázar et dans la foule de la Noche en Blanco : sac fermé devant.</li>
+            <li>Encore chaud début octobre : eau, crème solaire et casquette pour les visites de midi.</li>
+            <li>Urgences : <strong>112</strong>. Pharmacies de garde : croix verte allumée.</li>
+            <li>Pensez à la carte européenne d’assurance maladie.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h3>💶 Argent & usages</h3>
+          <ul>
+            <li>La carte passe presque partout, sauf quelques vieux bars et les stands du marché du jeudi.</li>
+            <li>Pourboire non obligatoire : arrondir, ou laisser 5–10 % au restaurant si le service était top.</li>
+            <li>Tenue : décontractée chic le soir ; épaules couvertes conseillées dans les églises.</li>
+            <li>Dire « buenas » en entrant dans un bar, « ¡gracias, hasta luego! » en partant : ça change l’accueil.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h3>🛍 À ramener</h3>
+          <ul>
+            <li>Huile d’olive de la province (Estepa, Sierra Sur).</li>
+            <li>Une bouteille de manzanilla en rama ou d’amontillado.</li>
+            <li>Céramique de Triana (ateliers autour de la calle Alfarería / Centro Cerámica Triana).</li>
+            <li>Tortas de aceite Inés Rosales, turrón, biscuits de couvent.</li>
+            <li>Un éventail ancien chiné au marché du jeudi.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h3>👥 Utiliser l’appli à quatre</h3>
+          <ul>
+            <li>Chacun entre son prénom + le code du groupe une fois sur son téléphone.</li>
+            <li>✏️ pour modifier une étape, « ＋ Proposer une activité » pour en ajouter.</li>
+            <li>Réagissez avec 👍 ❤️ 😋 🤔 👎 et commentez 💬 sous chaque étape ou adresse.</li>
+            <li>« Quoi de neuf » en haut montre les dernières actions des autres ; mise à jour automatique toutes les 20 s.</li>
+            <li>Astuce : « Ajouter à l’écran d’accueil » dans le navigateur pour l’avoir comme une appli.</li>
+          </ul>
+        </article>
       </div>
     </section>
   </main>
+
+  <dialog id="editor">
+    <form id="editForm" method="dialog">
+      <h3 id="editTitle">Proposition</h3>
+      <input type="hidden" name="id">
+      <div class="row">
+        <label>Jour<select name="day"></select></label>
+        <label>Heure<input name="time" maxlength="20" placeholder="ex. 13h30, Soir"></label>
+      </div>
+      <label>Activité<textarea name="body" rows="3" maxlength="600" required placeholder="Ce qu’on fait…"></textarea></label>
+      <label>Conseil / recommandation<textarea name="tip" rows="2" maxlength="600" placeholder="Astuce, quoi commander, à quelle heure y aller…"></textarea></label>
+      <label>Lieu sur la carte<select name="place"></select></label>
+      <div class="dlg-actions">
+        <button type="button" id="delProp" class="btn danger">Supprimer</button>
+        <span class="spacer"></span>
+        <button type="button" id="cancelEdit" class="btn ghost">Annuler</button>
+        <button type="submit" class="btn">Enregistrer</button>
+      </div>
+    </form>
+  </dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
 
   <footer>
     <p>Guide perso · infos vérifiées fin septembre 2026 — horaires à reconfirmer sur place. Carte © OpenStreetMap.</p>

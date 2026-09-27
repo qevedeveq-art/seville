@@ -117,3 +117,57 @@ footer{text-align:center; color:var(--muted); font-size:.82rem; padding:24px 16p
   .tabs a{padding:8px 9px; font-size:.88rem}
   .timeline::before{left:68px} .timeline li{grid-template-columns:56px 1fr; gap:22px} .timeline li::after{left:63px} .timeline .t{font-size:.8rem}
 }
+
+/* ===== Collaboratif ===== */
+.small{font-size:.8rem}
+.link{background:none; border:0; padding:0; color:var(--azulejo); font:600 .85rem Inter,sans-serif; cursor:pointer; text-decoration:underline}
+.login h2{font-size:1.35rem}
+.login form{display:flex; flex-wrap:wrap; gap:8px; margin-top:8px}
+.login input{flex:1 1 160px}
+input,textarea,select{font:16px Inter,sans-serif; color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:10px; padding:10px 12px; width:100%}
+input:focus,textarea:focus,select:focus{outline:2px solid var(--albero); border-color:transparent}
+.who-bar{display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin:0 0 12px}
+#who{display:flex; align-items:center; gap:8px; font-size:.92rem}
+.avatar{width:30px; height:30px; border-radius:50%; color:#fff; display:inline-grid; place-items:center; font-weight:700; flex:none; font-size:.9rem}
+.avatar.sm{width:24px; height:24px; font-size:.75rem}
+.feed{margin-bottom:18px}
+.feed h2{font-size:1.25rem; margin-bottom:6px}
+.feed ul{list-style:none; padding:0; margin:8px 0 0}
+.feed li{display:flex; gap:10px; align-items:flex-start; padding:7px 0; border-top:1px dashed var(--line); font-size:.92rem}
+.notice{background:color-mix(in srgb, var(--albero) 18%, transparent); border-radius:10px; padding:10px 12px; font-size:.92rem}
+.item-head{display:flex; justify-content:space-between; gap:8px; align-items:flex-start}
+.icon-btn{background:none; border:1px solid var(--line); border-radius:8px; padding:3px 7px; cursor:pointer; font-size:.9rem; flex:none}
+.advice{margin-top:6px; font-size:.88rem; color:var(--muted); border-left:3px solid var(--albero); padding-left:8px}
+.by{font-size:.75rem; color:var(--muted); margin-top:6px}
+.reacts{display:flex; flex-wrap:wrap; gap:5px; margin-top:6px}
+.react{border:1px solid var(--line); background:var(--surface); border-radius:999px; padding:3px 9px; font-size:.9rem; cursor:pointer; color:var(--ink); line-height:1.4}
+.react.zero{opacity:.55}
+.react.mine{background:color-mix(in srgb, var(--albero) 30%, var(--surface)); border-color:var(--albero); opacity:1}
+.react b{font-size:.78rem}
+.react.talk{opacity:1; font-weight:600}
+.thread{margin-top:8px; padding:10px; background:var(--bg); border-radius:10px; border:1px solid var(--line)}
+.msg{display:flex; gap:8px; padding:6px 0}
+.msg .meta{font-size:.78rem; color:var(--muted)}
+.msg .body{font-size:.92rem; white-space:pre-wrap; word-break:break-word}
+.c-form{display:flex; gap:6px; margin-top:6px}
+.c-form input{padding:8px 10px; font-size:16px}
+.btn.sm{padding:8px 12px; font-size:.85rem}
+.btn.add{margin:10px 0 0 78px}
+.btn.danger{background:#a23b2a}
+.day-extra{display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:10px; margin-top:18px}
+.card.soft{box-shadow:none; background:color-mix(in srgb, var(--surface) 70%, var(--bg))}
+.card.soft h4{font:700 1.02rem Fraunces,serif; margin:0 0 6px}
+.card.soft ul{padding-left:1.1em; margin:0; font-size:.93rem}
+.discuss{margin-top:10px}
+.place .social{margin-top:8px; border-top:1px dashed var(--line); padding-top:6px}
+dialog{border:0; border-radius:16px; padding:0; width:min(560px,calc(100vw - 24px)); background:var(--surface); color:var(--ink); box-shadow:0 20px 60px rgba(0,0,0,.35)}
+dialog::backdrop{background:rgba(20,12,6,.5)}
+#editForm{padding:18px; display:flex; flex-direction:column; gap:10px}
+#editForm label{display:flex; flex-direction:column; gap:4px; font-weight:600; font-size:.85rem}
+#editForm .row{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+.dlg-actions{display:flex; gap:8px; align-items:center; margin-top:4px}
+.dlg-actions .spacer{flex:1}
+#toast{position:fixed; left:50%; bottom:20px; transform:translate(-50%,40px); opacity:0; background:#221a14; color:#fff; padding:10px 16px; border-radius:999px;
+  font-weight:600; font-size:.92rem; transition:.25s; z-index:3000; pointer-events:none; max-width:calc(100vw - 32px)}
+#toast.show{opacity:1; transform:translate(-50%,0)}
+@media (max-width:520px){ .btn.add{margin-left:0; width:100%} }
