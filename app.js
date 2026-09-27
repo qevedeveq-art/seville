@@ -291,6 +291,7 @@
       if (!confirm("Supprimer cette photo ?")) return;
       try { await rpc("guide_delete_photo", { p_author: me.name, p_id: id }); d.close(); await refresh(); } catch (err) { toast(err.message); }
     };
+    d.dataset.current = id; $("#photoReacts").innerHTML = `<div class="social">${reactionBar("photo:" + id, { noPhoto: true })}${thread("photo:" + id)}</div>`;
     d.showModal();
     try { const full = await rpc("guide_photo_full", { p_id: id }); if (full) $("#photoFull").src = full; } catch (e) {}
   }
@@ -524,7 +525,8 @@
     const d = DAYS[currentDay];
     if (!seenDays.has(d.key)) { seenDays.add(d.key); openThreads.add("day:" + d.key); }
     [...tabs.children].forEach((b, j) => b.setAttribute("aria-selected", j === currentDay));
-    const items = itemsForDay(d.key), tips = DAY_TIPS[d.key];
+    const plan = flightPlan();
+    const items = [...itemsForDay(d.key), ...flightItems(d.key)].sort((x, y) => timeKey(x.time_label) - timeKey(y.time_label)), tips = DAY_TIPS[d.key];
     panel.innerHTML = `<div class="day-head"><div><h3>${esc(d.title)}</h3><p class="mood">${esc(d.mood)}</p></div>${weatherHtml(d.key, true)}</div>
       ${me ? "" : `<p class="notice">👋 Identifiez-vous en haut de page pour modifier le programme, voter, commenter et partager des photos.</p>`}
       <div class="day-actions"><button class="btn sm ghost" data-route="${d.key}">🗺 Itinéraire du jour</button></div>
@@ -534,7 +536,9 @@
         const vote = /^🗳/.test(it.body || "");
         const edited = it.updated_by ? ` · modifié par ${esc(it.updated_by)} ${ago(it.updated_at)}` : "";
         const tag = vs.label ? `<span class="status ${vs.s}">${vs.label}</span> ` : (vote && me ? `<span class="status vote">🗳 En vote · ${vs.up} 👍 / ${vs.down} 👎</span> ` : "");
-        return `<li class="${vs.s === "ko" ? "collapsed ko" : ""} ${vs.s === "ok" ? "ok" : ""}"><div class="t">${esc(it.time_label)}</div><div class="x">
+        if (it.flight) return `<li class="flight"><div class="t">${esc(it.time_label)}</div><div class="x"><div class="item-head"><div><strong>${esc(it.body)}</strong></div>${me ? `<button class="icon-btn" data-flights title="Modifier les vols">✏️</button>` : ""}</div>${it.tip ? `<div class="advice">💡 ${esc(it.tip)}</div>` : ""}</div></li>`;
+        const late = d.key === "sam" && plan.lastStop != null && /\d/.test(it.time_label || "") && timeKey(it.time_label) > plan.lastStop;
+        return `<li class="${vs.s === "ko" ? "collapsed ko" : ""} ${vs.s === "ok" ? "ok" : ""}"><div class="t">${esc(it.time_label)}</div><div class="x">${late ? `<div class="late">⚠️ Après l’heure limite avant l’avion (${fmtMin(plan.lastStop)})</div>` : ""}
           ${vs.s === "ko" ? `<div class="ko-line">${vs.label} — ${esc((it.body || "").replace(/^🗳\s*/, "").slice(0, 50))}… <button class="link" data-expand>afficher</button></div>` : ""}
           <div class="full">
           <div class="item-head"><div>${tag}${esc((it.body || "").replace(/^🗳\s*/, ""))}</div>
@@ -558,7 +562,7 @@
   /* ================================================================
      Maintenant / ensuite
      ================================================================ */
-  function renderNow() {
+  function renderNowBase() {
     const box = $("#now"), n = madridNow(), key = DATE_DAY[n.date];
     const start = new Date("2026-09-30T18:00:00+02:00"), end = new Date("2026-10-04T02:00:00+02:00"), now = new Date();
     if (!key && now < start) {
@@ -593,6 +597,19 @@
       <button class="btn sm ghost" data-route="${k}">🗺 Itinéraire du jour</button></div>`;
   }
 
+  function renderNow() {
+    renderNowBase();
+    const box = $("#now"), plan = flightPlan(), t = trip(), others = S("positions").filter(p => !me || !same(p.author, me.name));
+    const remindOn = store.get("sev-remind", false) && "Notification" in window && Notification.permission === "granted";
+    box.insertAdjacentHTML("beforeend", `
+      ${t.out || t.ret ? `<div class="small now-fl">✈️ ${t.out ? `Aller ${esc(t.out.num || "")} ${hm(t.out.dep)}→${hm(t.out.arr)}` : ""}${t.ret ? ` · Retour ${esc(t.ret.num || "")} ${hm(t.ret.dep)}${plan.leave != null ? ` (quitter l’appart. ${fmtMin(plan.leave)})` : ""}` : ""}</div>` : ""}
+      ${others.length ? `<div class="small now-pos">👥 ${others.map(p => `<button class="link" data-pos="${esc(p.author)}">${esc(p.author)}</button> <span class="muted">(${ago(p.updated_at)}${myPos ? `, ${walkMin(distKm(myPos, [p.lat, p.lng]))} min` : ""})</span>`).join(" · ")}</div>` : ""}
+      <div class="now-links"><button class="btn sm" id="improvBtn">🎲 On improvise</button>
+      ${me && !remindOn ? `<button class="btn sm ghost" id="remindBtn">🔔 Rappels sur ce téléphone</button>` : ""}${remindOn ? `<span class="small muted">🔔 rappels actifs</span>` : ""}</div>
+      <div id="improv" class="improv" hidden></div>`);
+  }
+  document.addEventListener("click", e => { const b = e.target.closest("[data-pos]"); if (!b) return; const p = S("positions").find(x => same(x.author, b.dataset.pos)); if (p) { $("#carte").scrollIntoView({ behavior: "smooth" }); setTimeout(() => map.setView([p.lat, p.lng], 17), 350); } });
+
   /* ================================================================
      Réservations
      ================================================================ */
@@ -606,7 +623,7 @@
       return;
     }
     const bs = S("bookings").slice().sort((a, b) => DAY_KEYS.indexOf(a.day) - DAY_KEYS.indexOf(b.day) || timeKey(a.time_label) - timeKey(b.time_label));
-    box.innerHTML = `<div class="books">${bs.map(b => { const p = b.place_id && byId[b.place_id]; return `
+    box.innerHTML = `${flightCard()}${watchPanel()}<div class="books">${bs.map(b => { const p = b.place_id && byId[b.place_id]; const files = S("files").filter(f => f.booking_id === b.id); return `
       <article class="book ${STATUS_CLASS[b.status] || ""}">
         <div class="book-top"><span class="st">${esc(b.status)}</span><button class="icon-btn" data-book="${b.id}" title="Modifier">✏️</button></div>
         <h4>${esc(b.title)}</h4>
@@ -614,6 +631,8 @@
         ${b.ref ? `<div class="ref">N° <strong>${esc(b.ref)}</strong></div>` : ""}
         ${b.notes ? `<p class="small muted">${esc(b.notes)}</p>` : ""}
         <div class="links small">${b.url ? `<a href="${esc(b.url)}" target="_blank" rel="noopener">Réserver / billets →</a>` : ""}${p ? ` <button class="link" data-map="${p.id}">carte</button>` : ""}</div>
+        <div class="files">${files.map(f => `<span class="file"><button class="link" data-file="${f.id}">${f.mime === "application/pdf" ? "📄" : "🖼"} ${esc(f.name.slice(0, 28))}</button><button class="x" data-file-del="${f.id}" title="Retirer">×</button></span>`).join("")}
+          <button class="btn sm ghost" data-attach="${b.id}">📎 Joindre billet / QR</button></div>
         <div class="by">mis à jour par ${esc(b.updated_by || "?")} · ${ago(b.updated_at)}</div>
       </article>`; }).join("")}</div>
       <button class="btn add0" data-book="new">＋ Ajouter une réservation</button>`;
@@ -714,7 +733,7 @@
     ps.forEach(p => { const k = targetDay(p.target); (groups[k] = groups[k] || []).push(p); });
     box.innerHTML = `<p class="muted small">Ajoutez des photos avec 📷 sous chaque étape du programme, ou ici pour le jour sélectionné. Elles sont réduites automatiquement et visibles uniquement par le groupe.</p>
       <div class="album-actions"><button class="btn sm" data-photo="day:${DAY_KEYS[currentDay]}">📷 Ajouter au ${esc(dayName(DAY_KEYS[currentDay]).toLowerCase())}</button>
-      <button class="btn sm ghost print-btn">📖 Carnet de voyage (PDF)</button></div>
+      <button class="btn sm ghost print-btn">📖 Carnet de voyage (PDF)</button>${ps.length ? `<button class="btn sm ghost" id="zipBtn">⬇️ Toutes les photos (zip)</button>` : ""}</div>
       ${ps.length ? [...DAY_KEYS, "autres"].filter(k => groups[k]).map(k => `<h3 class="album-day">${k === "autres" ? "Adresses & divers" : esc(dayName(k))} <span class="muted small">(${groups[k].length})</span></h3>
         <div class="album-grid">${groups[k].map(p => `<button class="thumb big" data-photo-id="${p.id}" title="${esc(p.author)}">${thumbs[p.id] ? `<img src="${thumbs[p.id]}" alt="">` : `<span class="ph"></span>`}<span class="cap">${esc(p.author)}</span></button>`).join("")}</div>`).join("")
         : `<p class="muted">Pas encore de photo. À vous de jouer 📸</p>`}`;
@@ -800,14 +819,397 @@
           ${talk.length ? `<div class="p-com"><strong>Discussion :</strong> ${talk.map(c => `${esc(c.author)} : ${esc(c.body)}`).join(" · ")}</div>` : ""}
           ${dayPhotos.length ? `<div class="p-photos">${dayPhotos.map(p => thumbs[p.id] ? `<figure><img src="${thumbs[p.id]}"><figcaption>${esc(p.author)}${p.caption ? " — " + esc(p.caption) : ""}</figcaption></figure>` : "").join("")}</div>` : ""}</section>`;
       }).join("")}
+      <section class="p-day"><h2>🏆 Palmarès</h2>
+        ${(() => { const tp = ranking(["tapa", "dessert"]).slice(0, 5), vn = ranking(["vin", "cocktail"]).slice(0, 5);
+          const loved = S("proposals").map(p => ({ p, n: reactionsFor(p.id).filter(r => ["👍", "❤️", "😋"].includes(r.emoji)).length })).filter(x => x.n).sort((a, b) => b.n - a.n).slice(0, 5);
+          return `${tp.length ? `<h3>Meilleures tapas</h3><ol>${tp.map(x => `<li>${esc(x.item)} ${x.place ? `(${esc(x.place)})` : ""} — ${x.avg.toFixed(1)}/5</li>`).join("")}</ol>` : ""}
+            ${vn.length ? `<h3>Meilleurs vins</h3><ol>${vn.map(x => `<li>${esc(x.item)} ${x.place ? `(${esc(x.place)})` : ""} — ${x.avg.toFixed(1)}/5</li>`).join("")}</ol>` : ""}
+            ${loved.length ? `<h3>Moments préférés du groupe</h3><ol>${loved.map(x => `<li>${esc(x.p.body.replace(/^🗳\s*/, ""))} — ${x.n} ❤️/👍</li>`).join("")}</ol>` : ""}`; })()}
+      </section>
+      <section class="p-day"><h2>🗺 Notre parcours</h2>${routeSvg()}</section>
+      ${(() => { const best = S("photos").map(p => ({ p, n: reactionsFor("photo:" + p.id).length })).sort((a, b) => b.n - a.n).filter(x => thumbs[x.p.id]).slice(0, 8);
+        return best.length ? `<section class="p-day"><h2>📸 Meilleures photos</h2><div class="p-photos">${best.map(x => `<figure><img src="${thumbs[x.p.id]}"><figcaption>${esc(x.p.author)}${x.n ? ` · ${x.n} ❤️` : ""}</figcaption></figure>`).join("")}</div></section>` : ""; })()}
       <section class="p-day"><h2>Dépenses</h2><p>Total : <strong>${euro(total)}</strong></p><ul>${Object.entries(bal).map(([n, v]) => `<li>${esc(n)} : ${v >= 0 ? "+" : ""}${euro(v)}</li>`).join("")}</ul></section></div>`;
     setTimeout(() => window.print(), 400);
   }
 
   /* ================================================================
+     v4 — Vols, rappels, billets, improvisation, dégustations,
+          audio, positions, veille des places, carnet enrichi
+     ================================================================ */
+
+  /* ---------- Petit constructeur de formulaires en dialogue ---------- */
+  function formDialog(title, fields, onSave, opts) {
+    const d = document.createElement("dialog");
+    d.innerHTML = `<form class="dlg-pad form-grid"><h3>${esc(title)}</h3>
+      ${fields.map(f => f.type === "row" ? `<div class="row">${f.items.map(fieldHtml).join("")}</div>` : fieldHtml(f)).join("")}
+      <div class="dlg-actions">${opts && opts.onDelete ? `<button type="button" class="btn danger" data-del>Supprimer</button>` : ""}<span class="spacer"></span>
+      <button type="button" class="btn ghost" data-cancel>Annuler</button><button class="btn">Enregistrer</button></div></form>`;
+    function fieldHtml(f) {
+      const v = f.value == null ? "" : f.value;
+      if (f.type === "select") return `<label>${esc(f.label)}<select name="${f.name}">${f.options.map(o => `<option value="${esc(o[0])}" ${String(o[0]) === String(v) ? "selected" : ""}>${esc(o[1])}</option>`).join("")}</select></label>`;
+      if (f.type === "textarea") return `<label>${esc(f.label)}<textarea name="${f.name}" rows="2" maxlength="${f.max || 500}">${esc(v)}</textarea></label>`;
+      if (f.type === "stars") return `<label>${esc(f.label)}<div class="stars" data-name="${f.name}">${[1, 2, 3, 4, 5].map(i => `<button type="button" data-star="${i}" class="${i <= (+v || 0) ? "on" : ""}">★</button>`).join("")}<input type="hidden" name="${f.name}" value="${esc(v)}"></div></label>`;
+      return `<label>${esc(f.label)}<input name="${f.name}" type="${f.type || "text"}" value="${esc(v)}" ${f.required ? "required" : ""} maxlength="${f.max || 120}" placeholder="${esc(f.ph || "")}" ${f.list ? `list="${f.list}"` : ""}></label>`;
+    }
+    document.body.appendChild(d);
+    const form = d.querySelector("form");
+    d.querySelectorAll(".stars").forEach(st => st.addEventListener("click", e => {
+      const b = e.target.closest("[data-star]"); if (!b) return;
+      st.querySelector("input").value = b.dataset.star;
+      st.querySelectorAll("[data-star]").forEach(x => x.classList.toggle("on", +x.dataset.star <= +b.dataset.star));
+    }));
+    d.querySelector("[data-cancel]").onclick = () => d.close();
+    const del = d.querySelector("[data-del]"); if (del) del.onclick = async () => { if (confirm("Supprimer ?")) { try { await opts.onDelete(); d.close(); } catch (err) { toast(err.message); } } };
+    form.addEventListener("submit", async e => {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(form).entries());
+      try { await onSave(data); d.close(); } catch (err) { toast(err.message); }
+    });
+    d.addEventListener("close", () => d.remove());
+    d.showModal();
+    return d;
+  }
+
+  /* ---------- Vols ---------- */
+  const hm = iso => iso ? iso.slice(11, 16).replace(":", "h") : "?";
+  const minOf = iso => iso ? (+iso.slice(11, 13)) * 60 + (+iso.slice(14, 16)) : null;
+  const fmtMin = m => { m = ((m % 1440) + 1440) % 1440; return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`; };
+  function trip() { return (state && state.trip) || {}; }
+  function flightPlan() {
+    const t = trip(), out = t.out, ret = t.ret, plan = {};
+    if (out && out.arr) plan.home = minOf(out.arr) + 50;             // bagages + taxi 20 min
+    if (ret && ret.dep) { plan.leave = minOf(ret.dep) - 125; plan.lastStop = plan.leave - 45; } // taxi 25 min + 1h40 d’avance
+    return plan;
+  }
+  function flightItems(key) {
+    const t = trip(), p = flightPlan(), out = [];
+    if (key === "mer" && t.out) {
+      out.push({ id: "fl-out", flight: true, time_label: hm(t.out.dep), body: `✈️ Décollage ${t.out.num || ""} de Toulouse`, tip: t.out.num ? `Suivi en direct : bouton « Suivre le vol ».` : "" });
+      if (t.out.arr) out.push({ id: "fl-arr", flight: true, time_label: hm(t.out.arr), body: `🛬 Atterrissage à Séville — à l’appartement vers ${fmtMin(p.home)}`, tip: "Taxi officiel à la sortie, tarif forfaitaire affiché." });
+    }
+    if (key === "sam" && t.ret && t.ret.dep) {
+      out.push({ id: "fl-leave", flight: true, time_label: fmtMin(p.leave), body: `🧳 Départ de l’appartement pour l’aéroport (vol ${t.ret.num || ""} à ${hm(t.ret.dep)})`, tip: `Terminer la dernière étape vers ${fmtMin(p.lastStop)}. Réserver un taxi 30 min avant.` });
+      out.push({ id: "fl-ret", flight: true, time_label: hm(t.ret.dep), body: `✈️ Décollage ${t.ret.num || ""} vers Toulouse`, tip: "" });
+    }
+    return out;
+  }
+  function flightCard() {
+    const t = trip(), p = flightPlan();
+    const one = (k, lbl) => {
+      const f = t[k];
+      if (!f) return `<div class="fl"><div class="small muted">${lbl}</div><p class="muted">Non renseigné</p></div>`;
+      const links = f.num ? `<a href="https://www.flightradar24.com/data/flights/${encodeURIComponent(f.num.replace(/\s/g, "").toLowerCase())}" target="_blank" rel="noopener">Suivre le vol</a> · <a href="https://www.flightaware.com/live/flight/${encodeURIComponent(f.num.replace(/\s/g, ""))}" target="_blank" rel="noopener">FlightAware</a>` : "";
+      return `<div class="fl"><div class="small muted">${lbl}</div><strong>${esc(f.num || "Vol")}</strong> · ${esc(f.date || "")} <br>🛫 ${hm(f.dep)} → 🛬 ${hm(f.arr)}
+        ${f.ref ? `<div class="small">Réf. <strong>${esc(f.ref)}</strong></div>` : ""}<div class="small">${links}</div></div>`;
+    };
+    return `<div class="card flights"><div class="book-top"><h3>✈️ Nos vols</h3>${me ? `<button class="icon-btn" data-flights title="Modifier">✏️</button>` : ""}</div>
+      <div class="fl-row">${one("out", "Aller · mer. 30 sept.")}${one("ret", "Retour · sam. 3 oct.")}</div>
+      ${p.home != null ? `<p class="small">🏠 Arrivée estimée à l’appartement : <strong>${fmtMin(p.home)}</strong></p>` : ""}
+      ${p.leave != null ? `<p class="small">🧳 Samedi : quitter l’appartement à <strong>${fmtMin(p.leave)}</strong>, dernière étape jusqu’à ${fmtMin(p.lastStop)}.</p>` : ""}
+      ${!t.out && !t.ret ? `<p class="small muted">Renseignez les numéros et horaires : le mercredi et le samedi se recalculent tout seuls, avec rappel « partir pour l’aéroport ».</p>` : ""}</div>`;
+  }
+  function editFlights() {
+    const t = trip(), o = t.out || {}, r = t.ret || {};
+    const tm = iso => iso ? iso.slice(11, 16) : "";
+    formDialog("Nos vols", [
+      { type: "row", items: [{ name: "o_num", label: "Aller : n° de vol", value: o.num, ph: "V7 1234" }, { name: "o_ref", label: "Réf. réservation", value: o.ref }] },
+      { type: "row", items: [{ name: "o_dep", label: "Décollage (mer. 30)", type: "time", value: tm(o.dep) }, { name: "o_arr", label: "Atterrissage", type: "time", value: tm(o.arr) }] },
+      { type: "row", items: [{ name: "r_num", label: "Retour : n° de vol", value: r.num, ph: "V7 1235" }, { name: "r_ref", label: "Réf. réservation", value: r.ref }] },
+      { type: "row", items: [{ name: "r_dep", label: "Décollage (sam. 3)", type: "time", value: tm(r.dep) }, { name: "r_arr", label: "Atterrissage", type: "time", value: tm(r.arr) }] }
+    ], async d => {
+      const mk = (date, dep, arr, num, ref) => ({ date, num: num.trim().toUpperCase(), ref: ref.trim(), dep: dep ? `${date}T${dep}` : null, arr: arr ? `${date}T${arr}` : null });
+      await rpc("guide_save_trip", { p_author: me.name, p_key: "out", p_data: mk("2026-09-30", d.o_dep, d.o_arr, d.o_num, d.o_ref) });
+      await rpc("guide_save_trip", { p_author: me.name, p_key: "ret", p_data: mk("2026-10-03", d.r_dep, d.r_arr, d.r_num, d.r_ref) });
+      await refresh(); toast("Vols enregistrés ✈️");
+    });
+  }
+
+  /* ---------- Rappels sur ce téléphone ---------- */
+  const notified = new Set(store.get("sev-notified", []));
+  async function enableReminders() {
+    if (!("Notification" in window)) return toast("Notifications non disponibles ici (sur iPhone : ajoutez l’appli à l’écran d’accueil).", 5000);
+    const p = await Notification.requestPermission();
+    store.set("sev-remind", p === "granted");
+    toast(p === "granted" ? "🔔 Rappels activés sur ce téléphone" : "Rappels refusés", 3000); renderNow();
+  }
+  async function notify(title, body, tag) {
+    try {
+      const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
+      if (reg) reg.showNotification(title, { body, tag, icon: "icons/icon-192.png", badge: "icons/icon-192.png" });
+      else new Notification(title, { body, tag });
+    } catch (e) {}
+  }
+  function checkReminders() {
+    if (!store.get("sev-remind", false) || !("Notification" in window) || Notification.permission !== "granted") return;
+    const n = madridNow(), key = DATE_DAY[n.date]; if (!key) return;
+    const items = [...itemsForDay(key).filter(it => voteStatus(it.id).s !== "ko"), ...flightItems(key)];
+    items.forEach(it => {
+      const t = timeKey(it.time_label), delta = t - n.min, id = key + ":" + (it.id || it.body);
+      if (delta > 0 && delta <= 40 && !notified.has(id)) {
+        notified.add(id); store.set("sev-notified", [...notified]);
+        const p = it.place_id && byId[it.place_id];
+        const bk = S("bookings").find(b => b.day === key && p && b.place_id === p.id && b.ref);
+        notify(`Dans ${delta} min · ${it.time_label}`, `${(it.body || "").replace(/^🗳\s*/, "")}${p ? " — " + p.name : ""}${bk ? ` (réf. ${bk.ref})` : ""}`, id);
+      }
+    });
+  }
+  setInterval(checkReminders, 60000);
+
+  /* ---------- Stockage local (IndexedDB) pour billets hors ligne ---------- */
+  const idb = (() => {
+    let dbp;
+    const open = () => dbp || (dbp = new Promise((res, rej) => { const r = indexedDB.open("sev-files", 1); r.onupgradeneeded = () => r.result.createObjectStore("f"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }));
+    const tx = async (mode, fn) => { const db = await open(); return new Promise((res, rej) => { const t = db.transaction("f", mode); const q = fn(t.objectStore("f")); t.oncomplete = () => res(q && q.result); t.onerror = () => rej(t.error); }); };
+    return { get: k => tx("readonly", s => s.get(k)).catch(() => null), set: (k, v) => tx("readwrite", s => s.put(v, k)).catch(() => null), keys: () => tx("readonly", s => s.getAllKeys()).catch(() => []) };
+  })();
+  async function prefetchFiles() {
+    if (!me || !online) return;
+    const have = new Set(await idb.keys());
+    for (const f of S("files")) if (!have.has(f.id)) { try { const x = await rpc("guide_get_file", { p_id: f.id }); if (x) await idb.set(f.id, x); } catch (e) {} }
+    document.querySelectorAll("[data-file]").forEach(async b => { if (await idb.get(b.dataset.file)) b.classList.add("offline-ok"); });
+  }
+  async function openFile(id) {
+    let f = await idb.get(id);
+    if (!f) { try { f = await rpc("guide_get_file", { p_id: id }); if (f) idb.set(id, f); } catch (err) { return toast(err.message); } }
+    if (!f) return toast("Fichier introuvable.");
+    const bin = atob(f.data.split(",")[1]), arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([arr], { type: f.mime }));
+    const w = window.open(url, "_blank"); if (!w) location.href = url;
+  }
+  let fileBooking = null;
+  const fileInput = document.createElement("input");
+  fileInput.type = "file"; fileInput.accept = "application/pdf,image/*"; fileInput.hidden = true; document.body.appendChild(fileInput);
+  fileInput.addEventListener("change", async () => {
+    const f = fileInput.files[0]; fileInput.value = ""; if (!f || !fileBooking) return;
+    try {
+      toast("Envoi du billet…", 20000);
+      let data, mime = f.type;
+      if (/^image\//.test(mime)) { data = await resize(f, 1800, 0.85); mime = "image/jpeg"; }
+      else if (mime === "application/pdf") {
+        if (f.size > 2.3e6) throw new Error("PDF trop lourd (max 2,3 Mo). Faites une capture d’écran du QR code.");
+        data = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
+      } else throw new Error("Format non pris en charge (PDF ou image).");
+      const id = await rpc("guide_add_file", { p_author: me.name, p_booking: fileBooking, p_name: f.name, p_mime: mime, p_data: data });
+      await idb.set(id, { id, name: f.name, mime, data });
+      await refresh(); toast("Billet ajouté 🎟 (disponible hors ligne)");
+    } catch (err) { toast(err.message, 5000); }
+  });
+
+  /* ---------- Veille des places ---------- */
+  function watchPanel() {
+    const w = S("watch"); if (!w.length) return "";
+    const last = w.reduce((m, x) => x.checked_at > m ? x.checked_at : m, "");
+    return `<div class="card watch"><h3>🔔 Veille des places <span class="muted small">· vérifiée ${ago(last)} · toutes les 2 h</span></h3>
+      <ul>${w.map(x => `<li><span class="wbadge ${x.status}">${x.status === "dispo" ? "dispo" : "complet"}</span> <strong>${esc(x.label)}</strong>
+        <div class="small muted">${esc(x.detail || "")}${x.status === "dispo" && x.changed_at && Date.now() - new Date(x.changed_at) < 6 * 3600e3 ? " · <b>nouveau</b>" : ""}</div></li>`).join("")}</ul>
+      <p class="small muted">Les créneaux libérés sont signalés ici et par notification. Réservez sur le site officiel.</p></div>`;
+  }
+
+  /* ---------- On improvise ---------- */
+  const TYPICAL = { tapas: [["12:30", "16:30"], ["20:00", "24:00"]], table: [["13:30", "16:00"], ["20:30", "23:30"]], nuit: [["21:00", "26:00"]], marche: [["09:00", "14:30"]], monument: [["10:00", "18:00"]] };
+  function typicalOpen(p, min) {
+    const r = TYPICAL[p.cat]; if (!r) return false;
+    const toM = t => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+    const m = min < 360 ? min + 1440 : min;
+    return r.some(([o, c]) => m >= toM(o) && m < toM(c));
+  }
+  async function improvise() {
+    let pos = myPos;
+    if (!pos) { try { pos = await locateMe(); } catch (e) { pos = [byId.apt.lat, byId.apt.lng]; toast("Position indisponible : suggestions autour de l’appartement."); } }
+    const n = madridNow(), min = n.min;
+    const moment = min < 690 ? "petit-déj / balade" : min < 900 ? "apéro & déjeuner" : min < 1140 ? "visite / pause" : min < 1290 ? "apéro & tapas" : min < 1410 ? "dîner" : "dernier verre";
+    const cats = min < 690 ? ["tapas", "marche", "monument"] : min < 900 ? ["tapas", "table", "marche"] : min < 1140 ? ["monument", "tapas"] : min < 1290 ? ["tapas", "nuit"] : min < 1410 ? ["tapas", "table", "nuit"] : ["nuit", "tapas"];
+    let cand = PLACES.filter(p => cats.includes(p.cat) && p.cat !== "base").map(p => {
+      const o = openInfo(p); const open = o ? o.open : typicalOpen(p, min);
+      return { p, km: distKm(pos, [p.lat, p.lng]), open, verified: !!o };
+    }).filter(x => x.open && x.km < 1.2).sort((a, b) => a.km - b.km).slice(0, 3);
+    let neb = [];
+    if (DATE_DAY[n.date] === "ven" && min >= 1080) neb = NEB.filter(a => !a.full).map(a => ({ a, km: distKm(pos, [a.lat, a.lng]) })).filter(x => x.km < 0.8).sort((a, b) => a.km - b.km).slice(0, 2);
+    const box = $("#improv");
+    box.innerHTML = `<h4>🎲 On improvise · ${moment}</h4>${cand.length || neb.length ? `<ul class="plain">${cand.map(x => `<li><strong>${esc(x.p.name)}</strong> <span class="muted small">· ${walkMin(x.km)} min à pied${x.verified ? "" : " · horaires habituels"}</span>
+        <div class="small">${esc(x.p.order ? "👉 " + x.p.order : x.p.desc.slice(0, 90) + "…")}</div>
+        <div class="now-links"><a class="btn sm" href="${walkTo(x.p)}" target="_blank" rel="noopener">🚶 Y aller</a><button class="btn sm ghost" data-map="${x.p.id}">Carte</button></div></li>`).join("")}
+        ${neb.map(x => `<li>✦ <strong>${esc(x.a.t)}</strong> <span class="muted small">· ${walkMin(x.km)} min · ${esc(x.a.h)} · ${esc(x.a.p)}</span><div class="now-links"><a class="btn sm" href="${walkTo(x.a)}" target="_blank" rel="noopener">🚶 Y aller</a></div></li>`).join("")}</ul>`
+        : `<p class="muted">Rien d’ouvert tout près dans notre sélection : ouvrez la carte, ou demandez « ¿Dónde se tapea bien por aquí? » 😉</p>`}`;
+    box.hidden = false; box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  /* ---------- Audio (prononciation) ---------- */
+  function speak(text) {
+    if (!("speechSynthesis" in window)) return toast("Synthèse vocale non disponible sur cet appareil.");
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text); u.lang = "es-ES"; u.rate = 0.9;
+    const v = speechSynthesis.getVoices().find(v => /^es(-ES)?/i.test(v.lang)); if (v) u.voice = v;
+    speechSynthesis.speak(u);
+  }
+  const PHRASES = [
+    ["Buenas, ¿tenéis sitio para cuatro?", "Bonjour, vous avez de la place pour quatre ?"],
+    ["¿Qué nos recomienda?", "Que nous conseillez-vous ?"],
+    ["Una tapa de espinacas con garbanzos, por favor.", "Une tapa d’épinards aux pois chiches"],
+    ["Dos cañas y dos finos bien fríos.", "Deux pressions et deux finos bien frais"],
+    ["Media ración de boquerones en adobo.", "Une demi-portion d’anchois marinés frits"],
+    ["Un montadito de pringá.", "Un petit sandwich de pringá"],
+    ["¿Qué hay fuera de carta hoy?", "Qu’y a-t-il hors carte aujourd’hui ?"],
+    ["Otra ronda, por favor.", "Une autre tournée, s’il vous plaît"],
+    ["¿Nos cobras, por favor?", "L’addition, s’il vous plaît (familier)"],
+    ["Tenemos una reserva a nombre de Puechoultres.", "Nous avons une réservation au nom de…"],
+    ["¡Estaba todo buenísimo!", "C’était délicieux !"],
+    ["¿Dónde se tapea bien por aquí?", "Où mange-t-on bien des tapas par ici ?"]
+  ];
+  function renderPhrases() {
+    const box = $("#phrases"); if (!box) return;
+    box.innerHTML = `<h3>🔊 Commander à l’oral</h3><p class="small muted">Touchez une phrase pour l’entendre (voix espagnole de votre téléphone).</p>
+      <ul class="phr">${PHRASES.map(([es, fr]) => `<li><button class="say" data-say="${esc(es)}">🔊</button><div><strong>${esc(es)}</strong><div class="small muted">${esc(fr)}</div></div></li>`).join("")}</ul>`;
+  }
+
+  /* ---------- Positions partagées ---------- */
+  const posLayer = L.layerGroup().addTo(map);
+  let posWatch = null, lastSent = 0, sharingUntil = store.get("sev-share-until", 0);
+  async function startSharing() {
+    if (!me) return toast("Identifiez-vous d’abord.");
+    if (!navigator.geolocation) return toast("Géolocalisation indisponible.");
+    sharingUntil = Date.now() + 2 * 3600e3; store.set("sev-share-until", sharingUntil);
+    posWatch = navigator.geolocation.watchPosition(async p => {
+      myPos = [p.coords.latitude, p.coords.longitude];
+      if (Date.now() > sharingUntil) return stopSharing();
+      if (Date.now() - lastSent < 55000) return;
+      lastSent = Date.now();
+      try { await rpc("guide_share_pos", { p_author: me.name, p_lat: myPos[0], p_lng: myPos[1], p_acc: p.coords.accuracy, p_minutes: Math.round((sharingUntil - Date.now()) / 60000) }); }
+      catch (err) { toast(/check constraint|lat|lng/.test(err.message) ? "Vous n’êtes pas à Séville : position non partagée." : err.message, 4000); stopSharing(); }
+    }, () => { toast("Position non disponible."); stopSharing(); }, { enableHighAccuracy: true, maximumAge: 30000, timeout: 20000 });
+    renderShareBtn(); toast("📡 Position partagée avec le groupe pendant 2 h");
+  }
+  async function stopSharing() {
+    if (posWatch != null) navigator.geolocation.clearWatch(posWatch); posWatch = null;
+    sharingUntil = 0; store.set("sev-share-until", 0); lastSent = 0;
+    try { if (me) await rpc("guide_stop_pos", { p_author: me.name }); } catch (e) {}
+    renderShareBtn(); refresh(true);
+  }
+  const shareBtn = document.createElement("button"); shareBtn.className = "btn ghost"; shareBtn.id = "shareBtn";
+  shareBtn.onclick = () => posWatch != null ? stopSharing() : startSharing();
+  $(".map-actions").appendChild(shareBtn);
+  function renderShareBtn() { shareBtn.textContent = posWatch != null ? "📡 Arrêter le partage" : "📡 Où êtes-vous ? (partager 2 h)"; shareBtn.classList.toggle("sharing", posWatch != null); }
+  function renderPositions() {
+    posLayer.clearLayers();
+    S("positions").filter(p => !me || !same(p.author, me.name)).forEach(p => {
+      L.marker([p.lat, p.lng], { zIndexOffset: 3000, icon: L.divIcon({ className: "", iconSize: [34, 34], iconAnchor: [17, 17], html: `<div class="pos-pin" style="background:${colorOf(p.author)}">${esc(p.author[0].toUpperCase())}</div>` }) })
+        .bindPopup(`<strong>${esc(p.author)}</strong><br><span class="small">${ago(p.updated_at)}${myPos ? ` · ${walkMin(distKm(myPos, [p.lat, p.lng]))} min à pied` : ""}</span><br><a href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}&travelmode=walking" target="_blank" rel="noopener">Le/la rejoindre</a>`)
+        .addTo(posLayer);
+    });
+  }
+  if (sharingUntil > Date.now() && me) startSharing(); else renderShareBtn();
+
+  /* ---------- Dégustations ---------- */
+  const KIND = { tapa: "🍤 Tapa", vin: "🍷 Vin", dessert: "🍮 Dessert", cocktail: "🍸 Cocktail", autre: "✨ Autre" };
+  const placeName = t => t.place_id && byId[t.place_id] ? byId[t.place_id].name : (t.place_free || "");
+  const norm = s => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
+  function ranking(kinds) {
+    const g = {};
+    S("tastings").filter(t => kinds.includes(t.kind)).forEach(t => {
+      const k = norm(t.item) + "|" + norm(placeName(t));
+      (g[k] = g[k] || { item: t.item, place: placeName(t), kind: t.kind, notes: [] }).notes.push(t);
+    });
+    return Object.values(g).map(x => ({ ...x, avg: x.notes.reduce((s, t) => s + t.rating, 0) / x.notes.length }))
+      .sort((a, b) => b.avg - a.avg || b.notes.length - a.notes.length);
+  }
+  const starsTxt = n => "★".repeat(Math.round(n)) + "☆".repeat(5 - Math.round(n));
+  function editTasting(t) {
+    const places = PLACES.filter(p => ["tapas", "table", "nuit", "marche"].includes(p.cat));
+    formDialog(t ? "Modifier ma note" : "Noter une dégustation", [
+      { type: "row", items: [{ type: "select", name: "kind", label: "Type", value: t ? t.kind : "tapa", options: Object.entries(KIND) }, { type: "stars", name: "rating", label: "Note", value: t ? t.rating : 4 }] },
+      { name: "item", label: "Quoi", value: t ? t.item : "", required: true, ph: "Espinacas con garbanzos, fino La Ina…", list: "dishList" },
+      { type: "select", name: "place", label: "Où", value: t ? (t.place_id || "") : "", options: [["", "— autre / hors liste —"], ...places.map(p => [p.id, p.name])] },
+      { name: "place_free", label: "Autre lieu (si hors liste)", value: t ? (t.place_free || "") : "" },
+      { type: "textarea", name: "note", label: "Commentaire", value: t ? (t.note || "") : "" }
+    ], async d => {
+      if (!+d.rating) throw new Error("Choisissez une note (étoiles).");
+      await rpc("guide_save_tasting", { p_author: me.name, p_id: t ? t.id : null, p_kind: d.kind, p_item: d.item, p_place: d.place, p_place_free: d.place_free, p_rating: +d.rating, p_note: d.note });
+      await refresh(); toast("Note enregistrée ⭐");
+    }, t ? { onDelete: async () => { await rpc("guide_delete_tasting", { p_author: me.name, p_id: t.id }); await refresh(); } } : null);
+  }
+  function renderTastings() {
+    const box = $("#degustBox"); if (!box) return;
+    if (!me) { box.innerHTML = `<p class="notice">Identifiez-vous pour noter tapas et vins.</p>`; return; }
+    const all = S("tastings"), mine = all.filter(t => same(t.author, me.name));
+    const dishes = [...new Set(all.map(t => t.item))];
+    const podium = (title, list) => `<div class="card"><h3>${title}</h3>${list.length ? `<ol class="podium">${list.slice(0, 5).map((x, i) => `<li><span class="rank">${["🥇", "🥈", "🥉", "4", "5"][i]}</span><div><strong>${esc(x.item)}</strong>${x.place ? ` <span class="muted small">· ${esc(x.place)}</span>` : ""}
+        <div class="small"><span class="stars-txt">${starsTxt(x.avg)}</span> ${x.avg.toFixed(1)} · ${x.notes.length} note${x.notes.length > 1 ? "s" : ""} (${x.notes.map(n => esc(n.author)).join(", ")})</div></div></li>`).join("")}</ol>` : `<p class="muted small">Pas encore de note.</p>`}</div>`;
+    box.innerHTML = `<datalist id="dishList">${dishes.map(d => `<option value="${esc(d)}">`).join("")}</datalist>
+      <div class="album-actions"><button class="btn" id="addTaste">⭐ Noter une dégustation</button></div>
+      <div class="grid2">${podium("🏆 Meilleures tapas", ranking(["tapa", "dessert"]))}${podium("🍷 Meilleurs vins & verres", ranking(["vin", "cocktail"]))}</div>
+      ${all.length ? `<div class="card exp-list"><h3>Toutes les notes (${all.length})</h3><ul>${all.slice().reverse().map(t => `<li><div>${KIND[t.kind].split(" ")[0]} <strong>${esc(t.item)}</strong> <span class="stars-txt">${starsTxt(t.rating)}</span>
+        <div class="small muted">${esc(t.author)}${placeName(t) ? " · " + esc(placeName(t)) : ""} · ${ago(t.created_at)}${t.note ? " — " + esc(t.note) : ""}</div></div>
+        ${same(t.author, me.name) ? `<button class="icon-btn" data-taste="${t.id}">✏️</button>` : ""}</li>`).join("")}</ul></div>` : ""}`;
+    $("#addTaste").onclick = () => editTasting(null);
+  }
+
+  /* ---------- Téléchargement groupé (zip) ---------- */
+  function loadJSZip() {
+    return window.JSZip ? Promise.resolve(window.JSZip) : new Promise((res, rej) => {
+      const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
+      s.onload = () => res(window.JSZip); s.onerror = () => rej(new Error("Impossible de charger l’outil zip.")); document.head.appendChild(s);
+    });
+  }
+  async function downloadAlbum() {
+    const ps = S("photos"); if (!ps.length) return toast("Aucune photo.");
+    try {
+      const JSZip = await loadJSZip(), zip = new JSZip();
+      let i = 0;
+      for (const p of ps) {
+        toast(`Préparation ${++i}/${ps.length}…`, 30000);
+        const full = await rpc("guide_photo_full", { p_id: p.id }); if (!full) continue;
+        const day = dayLabel(targetDay(p.target)) || "divers";
+        zip.file(`${day.replace(/\s/g, "-")}_${String(i).padStart(3, "0")}_${p.author}.jpg`, full.split(",")[1], { base64: true });
+      }
+      const blob = await zip.generateAsync({ type: "blob" });
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "Puechoultres-Devesa-Seville-photos.zip"; a.click();
+      toast("Album téléchargé 📦");
+    } catch (err) { toast(err.message, 4000); }
+  }
+
+  /* ---------- Carte SVG du parcours (carnet) ---------- */
+  function routeSvg() {
+    const days = DAYS.map((d, i) => ({ d, color: ["#6b4fa3", "#b5452b", "#1f5f8b", "#2f7d4f"][i],
+      pts: itemsForDay(d.key).filter(it => it.place_id && byId[it.place_id] && voteStatus(it.id).s !== "ko").map(it => byId[it.place_id]) }));
+    const all = days.flatMap(x => x.pts); if (!all.length) return "";
+    const lats = all.map(p => p.lat), lngs = all.map(p => p.lng);
+    const [a, b, c, e] = [Math.min(...lats), Math.max(...lats), Math.min(...lngs), Math.max(...lngs)];
+    const W = 600, H = 420, pad = 30, kx = (W - 2 * pad) / ((e - c) || 1), ky = (H - 2 * pad) / ((b - a) || 1), k = Math.min(kx, ky / 1.25);
+    const X = p => pad + (p.lng - c) * k, Y = p => H - pad - (p.lat - a) * k * 1.25;
+    return `<svg viewBox="0 0 ${W} ${H}" class="route-svg" xmlns="http://www.w3.org/2000/svg"><rect width="${W}" height="${H}" fill="#fbf6ec"/>
+      ${days.map(x => `<polyline fill="none" stroke="${x.color}" stroke-width="3" stroke-dasharray="6 4" points="${x.pts.map(p => `${X(p).toFixed(1)},${Y(p).toFixed(1)}`).join(" ")}"/>
+        ${x.pts.map(p => `<circle cx="${X(p).toFixed(1)}" cy="${Y(p).toFixed(1)}" r="4" fill="${x.color}"/>`).join("")}`).join("")}
+      <circle cx="${X(byId.apt)}" cy="${Y(byId.apt)}" r="7" fill="#1f2a44"/><text x="${X(byId.apt) + 9}" y="${Y(byId.apt) + 4}" font-size="11" font-family="sans-serif">appart.</text>
+      ${days.map((x, i) => `<rect x="${pad + i * 140}" y="8" width="10" height="10" fill="${x.color}"/><text x="${pad + i * 140 + 14}" y="17" font-size="11" font-family="sans-serif">${esc(x.d.label)}</text>`).join("")}</svg>`;
+  }
+
+  /* ---------- Événements v4 ---------- */
+  document.addEventListener("click", e => {
+    const t = e.target;
+    if (t.closest("[data-flights]")) return editFlights();
+    if (t.closest("#remindBtn")) return enableReminders();
+    if (t.closest("#improvBtn")) return improvise();
+    const say = t.closest("[data-say]"); if (say) return speak(say.dataset.say);
+    const fa = t.closest("[data-attach]"); if (fa) { fileBooking = fa.dataset.attach; fileInput.click(); return; }
+    const fo = t.closest("[data-file]"); if (fo) return openFile(fo.dataset.file);
+    const fd = t.closest("[data-file-del]"); if (fd) { if (confirm("Retirer ce billet ?")) rpc("guide_delete_file", { p_id: fd.dataset.fileDel }).then(() => refresh()).catch(err => toast(err.message)); return; }
+    const tt = t.closest("[data-taste]"); if (tt) return editTasting(S("tastings").find(x => x.id === tt.dataset.taste));
+    if (t.closest("#zipBtn")) return downloadAlbum();
+  });
+
+  function renderV4() {
+    renderPositions(); renderTastings(); renderPhrases();
+    const ro = $("#roBanner"); if (ro) ro.hidden = !(state && state.read_only);
+    const pd = $("#photoDlg"); if (pd.open && pd.dataset.current) $("#photoReacts").innerHTML = `<div class="social">${reactionBar("photo:" + pd.dataset.current, { noPhoto: true })}${thread("photo:" + pd.dataset.current)}</div>`;
+    checkReminders(); prefetchFiles();
+  }
+
+  /* ================================================================
      Rendu global + démarrage
      ================================================================ */
-  function renderAll() { renderNow(); renderDay(); renderBookings(); renderExpenses(); renderAlbum(); renderPlaces(); renderFeed(); loadThumbs(); }
+  function renderAll() { renderNow(); renderDay(); renderBookings(); renderExpenses(); renderAlbum(); renderPlaces(); renderFeed(); renderV4(); loadThumbs(); }
   renderWho();
   renderAll();
   loadWeather();

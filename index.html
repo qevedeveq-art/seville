@@ -34,9 +34,11 @@
     <a href="#resa">Résas</a>
     <a href="#depenses">Dépenses</a>
     <a href="#album">Album</a>
+    <a href="#degust">Dégustations</a>
     <a href="#adresses">Adresses</a>
     <a href="#pratique">Pratique</a>
   </nav>
+  <div id="roBanner" class="offline" hidden>📚 Voyage terminé : l’appli est en lecture seule (souvenirs, photos et carnet restent accessibles).</div>
   <div id="offline" class="offline" hidden>📴 Hors ligne : affichage de la dernière version enregistrée. Les modifications reprendront au retour du réseau.</div>
 
   <main>
@@ -87,6 +89,12 @@
       <div id="albumBox"></div>
     </section>
 
+    <section id="degust">
+      <h2 class="section-title">Dégustations</h2>
+      <p class="muted intro">Chacun note tapas et vins (1 à 5 ★) : le classement du groupe se construit tout seul et finit dans le carnet.</p>
+      <div id="degustBox"></div>
+    </section>
+
     <section id="adresses">
       <h2 class="section-title">Nos adresses</h2>
       <p class="muted intro">Sélection orientée « là où vont les Sévillans ». Règle d’or : on mange au comptoir, tapa par tapa, et on change de bar.</p>
@@ -97,6 +105,7 @@
       <h2 class="section-title">Pratique</h2>
 
       <div class="grid">
+        <article class="card" id="phrases"></article>
         <article class="card">
           <h3>🕘 Le rythme sévillan</h3>
           <ul>
@@ -272,7 +281,7 @@
     </form>
   </dialog>
 
-  <dialog id="photoDlg" class="photo-dlg"><div class="dlg-pad"><img id="photoFull" alt=""><p id="photoCap" class="muted small"></p>
+  <dialog id="photoDlg" class="photo-dlg"><div class="dlg-pad"><img id="photoFull" alt=""><p id="photoCap" class="muted small"></p><div id="photoReacts"></div>
     <div class="dlg-actions"><button class="btn danger" id="photoDel" hidden>Supprimer ma photo</button><span class="spacer"></span><button class="btn ghost" id="photoClose">Fermer</button></div></div></dialog>
 
   <input type="file" id="photoInput" accept="image/*" multiple hidden>
