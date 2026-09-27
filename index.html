@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Séville à quatre · 30 sept – 3 oct 2026</title>
+  <meta name="description" content="Notre guide de Séville : programme, carte, adresses aimées des Sévillans.">
+  <meta name="theme-color" content="#b5452b">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍊</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <p class="kicker">30 septembre → 3 octobre 2026</p>
+      <h1>Séville,<br><em>comme un Sévillan</em></h1>
+      <p class="lead">Quatre jours à quatre : tapas de quartier, fino bien frais, palais mudéjars, marché aux puces du jeudi et Noche en Blanco.</p>
+      <div class="countdown" id="countdown"></div>
+    </div>
+  </header>
+
+  <nav class="tabs" id="nav">
+    <a href="#programme">Programme</a>
+    <a href="#carte">Carte</a>
+    <a href="#adresses">Adresses</a>
+    <a href="#pratique">Pratique</a>
+  </nav>
+
+  <main>
+    <section id="reserver" class="card todo">
+      <h2>À réserver avant de partir</h2>
+      <p class="muted">Cochez au fur et à mesure (mémorisé sur cet appareil).</p>
+      <ul id="todo"></ul>
+    </section>
+
+    <section id="programme">
+      <h2 class="section-title">Programme</h2>
+      <div class="day-tabs" id="dayTabs" role="tablist"></div>
+      <div id="dayPanel" class="day-panel"></div>
+    </section>
+
+    <section id="carte">
+      <h2 class="section-title">Carte</h2>
+      <div class="filters" id="filters"></div>
+      <div id="map" aria-label="Carte de Séville"></div>
+      <div class="map-actions">
+        <button id="locate" class="btn">📍 Où sommes-nous ?</button>
+        <button id="fitAll" class="btn ghost">Tout afficher</button>
+      </div>
+    </section>
+
+    <section id="adresses">
+      <h2 class="section-title">Nos adresses</h2>
+      <p class="muted intro">Sélection orientée « là où vont les Sévillans ». Règle d’or : on mange au comptoir, tapa par tapa, et on change de bar.</p>
+      <div id="placeList"></div>
+    </section>
+
+    <section id="pratique">
+      <h2 class="section-title">Pratique</h2>
+
+      <div class="grid">
+        <article class="card">
+          <h3>🕘 Le rythme sévillan</h3>
+          <ul>
+            <li>Petit-déj : café + tostada, 9h–10h.</li>
+            <li>Apéro / vermut : 12h30–14h.</li>
+            <li>Déjeuner : 14h–16h. Siesta ensuite.</li>
+            <li>Tapeo du soir : dès 20h30 ; dîner 21h30–23h.</li>
+            <li>Début octobre : ~28 °C l’après-midi, 17 °C la nuit. Soleil couchant ~19h45.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h3>🚫 Éviter les attrape-touristes</h3>
+          <ul>
+            <li>Menus en photos, rabatteurs en terrasse, cartes en 6 langues (Mateos Gago, Av. de la Constitución).</li>
+            <li>Paella au dîner et sangria : pas local. On boit fino, manzanilla, caña, tinto de verano.</li>
+            <li>« Tablao + dîner » : préférer la peña du jeudi ou La Carbonería.</li>
+            <li>Brins de romarin offerts près de la Cathédrale : poliment « no, gracias » et on continue.</li>
+            <li>Le bon signe : serviettes en papier par terre, comptoir plein, ardoise en espagnol.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h3>🍷 Commander comme un local</h3>
+          <dl class="lexique">
+            <dt>Una caña</dt><dd>petite pression</dd>
+            <dt>Un fino / una manzanilla</dt><dd>vins blancs secs de Jerez / Sanlúcar, servis très frais</dd>
+            <dt>Tinto de verano</dt><dd>vin rouge + limonade, l’été sévillan</dd>
+            <dt>Tapa / media / ración</dt><dd>petite / moitié / grande portion à partager</dd>
+            <dt>Montadito</dt><dd>petit sandwich chaud</dd>
+            <dt>Pringá</dt><dd>effiloché des viandes du pot-au-feu</dd>
+            <dt>¿Qué nos recomienda?</dt><dd>que nous conseillez-vous ?</dd>
+            <dt>La cuenta, por favor</dt><dd>l’addition, s’il vous plaît</dd>
+          </dl>
+        </article>
+
+        <article class="card">
+          <h3>🌙 Noche en Blanco — vendredi 2 oct.</h3>
+          <ul>
+            <li>13e édition, 18h → 2h, plus de 140 activités gratuites ou à petit prix (2–25 €).</li>
+            <li>Palais, musées et églises ouverts la nuit, concerts, théâtre, routes patrimoniales.</li>
+            <li>Beaucoup d’activités <strong>sur réservation</strong> : consulter le programme et la carte sur <a href="https://nocheenblanco.org/" target="_blank" rel="noopener">nocheenblanco.org</a> dès lundi.</li>
+            <li>Tout se fait à pied depuis l’appartement.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h3>🚕 Se déplacer</h3>
+          <ul>
+            <li>Aéroport ↔ centre : taxi à tarif forfaitaire (~25–30 €, idéal à 4) ou bus EA (~4 €/pers.).</li>
+            <li>Dans le centre : tout à pied. Triana et Plaza de España à ~25 min.</li>
+            <li>Pièces et petits billets pour le marché du jeudi et les vieux bars.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h3>🎟 Billets & horaires clés</h3>
+          <ul>
+            <li><strong>Alcázar</strong> : 9h30–17h en octobre · 15,50 € · <a href="https://alcazarsevilla.org/" target="_blank" rel="noopener">site officiel</a></li>
+            <li><strong>Cathédrale + Giralda + Salvador</strong> : lun–sam 10h45–19h · 13 € en ligne · <a href="https://catedraldesevilla.servitickets.es/" target="_blank" rel="noopener">billetterie officielle</a></li>
+            <li><strong>El Jueves</strong> : jeudi 8h–15h, calle Feria</li>
+            <li>Acheter uniquement sur les sites officiels (beaucoup de revendeurs majorés).</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Guide perso · infos vérifiées fin septembre 2026 — horaires à reconfirmer sur place. Carte © OpenStreetMap.</p>
+  </footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
