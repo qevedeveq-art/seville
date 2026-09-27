@@ -10,7 +10,8 @@ const CATEGORIES = {
   tapas:    { label: "Tapas & bodegas", color: "#b5452b", icon: "🍷" },
   table:    { label: "Belles tables",   color: "#7a2e52", icon: "🍽" },
   nuit:     { label: "Flamenco & nuit", color: "#6b4fa3", icon: "♪" },
-  marche:   { label: "Marchés",         color: "#2f7d4f", icon: "◆" }
+  marche:   { label: "Marchés",         color: "#2f7d4f", icon: "◆" },
+  neb:      { label: "Noche en Blanco", color: "#c8901a", icon: "✦" }
 };
 
 const PLACES = [
@@ -21,12 +22,12 @@ const PLACES = [
     tip: "Check-in officiel 15h–20h : prévenir l’hôte de notre arrivée tardive mercredi soir." },
 
   // ---------- INCONTOURNABLES ----------
-  { id: "alcazar", cat: "monument", name: "Real Alcázar", area: "Santa Cruz",
+  { id: "alcazar", cat: "monument", hours: [{ d:[0,1,2,3,4,5,6], o:"09:30", c:"17:00" }], name: "Real Alcázar", area: "Santa Cruz",
     lat: 37.38321, lng: -5.99018,
     desc: "Palais royal mudéjar encore en usage, patios, azulejos et jardins immenses. Le monument n°1 de Séville.",
     tip: "Octobre : 9h30–17h. Billet 15,50 € (+5,50 € Cuarto Real Alto, les appartements royaux). Réserver le créneau de 9h30 sur le site officiel uniquement.",
     url: "https://alcazarsevilla.org/" },
-  { id: "catedral", cat: "monument", name: "Cathédrale & Giralda", area: "Centro",
+  { id: "catedral", cat: "monument", hours: [{ d:[1,2,3,4,5,6], o:"10:45", c:"19:00" }, { d:[0], o:"14:30", c:"19:00" }], name: "Cathédrale & Giralda", area: "Centro",
     lat: 37.38591, lng: -5.99314,
     desc: "La plus grande cathédrale gothique du monde, tombeau de Colomb, et la montée de la Giralda (rampes, pas de marches) pour la vue.",
     tip: "Lun–sam 10h45–19h. 13 € en ligne (14 € sur place), Giralda + église du Salvador incluses. Visite des toits en option (20 €).",
@@ -74,7 +75,7 @@ const PLACES = [
     desc: "Façade plateresque ; lieu régulier de la Noche en Blanco (visites nocturnes)." },
 
   // ---------- MARCHÉS ----------
-  { id: "jueves", cat: "marche", name: "Mercadillo « El Jueves »", area: "Calle Feria",
+  { id: "jueves", cat: "marche", hours: [{ d:[4], o:"08:00", c:"15:00" }], name: "Mercadillo « El Jueves »", area: "Calle Feria",
     lat: 37.39870, lng: -5.99160,
     desc: "Le plus vieux marché aux puces de Séville (depuis le XIIIe s. !), chaque jeudi sur la calle Feria : brocante, vieux azulejos, affiches de Semana Santa, vinyles, bric-à-brac.",
     tip: "Jeudi 8h–15h. Y aller avant 10h30 pour les meilleures trouvailles. Espèces, et on négocie." },
@@ -92,7 +93,7 @@ const PLACES = [
     lat: 37.39334, lng: -5.98829,
     desc: "Le plus vieux bar de Séville (1670). Comptoir en acajou, l’addition à la craie. Célèbre, mais les Sévillans y viennent toujours.",
     order: "Espinacas con garbanzos, croquetas, bacalao, un fino." },
-  { id: "eslava", cat: "tapas", name: "Eslava", area: "San Lorenzo", addr: "Calle Eslava 3",
+  { id: "eslava", cat: "tapas", hours: [{ d:[2,3,4,5,6], o:"12:30", c:"24:00" }, { d:[0], o:"12:30", c:"16:30" }], name: "Eslava", area: "San Lorenzo", addr: "Calle Eslava 3",
     lat: 37.39755, lng: -5.99692,
     desc: "La référence de la tapa créative, plébiscitée par les locaux. Bar à tapas + salle restaurant (réservable).",
     order: "Cigarro para Bécquer, huevo sobre bizcocho de boletus, costilla a la miel de caña.",
@@ -169,7 +170,7 @@ const PLACES = [
     order: "Churros con chocolate, ou tostada con tomate y aceite." },
 
   // ---------- BELLES TABLES ----------
-  { id: "sobretablas", cat: "table", name: "Sobretablas", area: "El Porvenir", addr: "Calle Colombia 7",
+  { id: "sobretablas", cat: "table", hours: [{ d:[2,3,4,5,6], o:"13:45", c:"16:30" }, { d:[2,3,4,5,6], o:"20:15", c:"23:00" }], name: "Sobretablas", area: "El Porvenir", addr: "Calle Colombia 7",
     lat: 37.36975, lng: -5.98453,
     desc: "Guide Michelin, couple passé par El Celler de Can Roca. Cuisine andalouse revisitée et l’une des meilleures cartes de vins de Jerez de la province. À 5 min de la Plaza de España.",
     order: "Carabineros con chicharrones, menu dégustation avec accords de Jerez.",
@@ -177,7 +178,7 @@ const PLACES = [
     url: "https://sobretablasrestaurante.com/" },
 
   // ---------- FLAMENCO & NUIT ----------
-  { id: "torresmac", cat: "nuit", name: "Peña Flamenca Torres Macarena", area: "Macarena", addr: "Calle Torrijiano 29",
+  { id: "torresmac", cat: "nuit", hours: [{ d:[4], o:"20:00", c:"24:00" }], name: "Peña Flamenca Torres Macarena", area: "Macarena", addr: "Calle Torrijiano 29",
     lat: 37.40430, lng: -5.99069,
     desc: "Vraie peña (club d’aficionados) : chaque JEUDI, tertulia flamenca à partir de 20h. Public de connaisseurs, bar associatif, zéro mise en scène. À 10 min à pied de l’appartement.",
     tip: "Entrée libre ou très modique, consommation au bar. Arriver vers 20h30 ; être discret pendant le chant.",
@@ -186,7 +187,7 @@ const PLACES = [
     lat: 37.38776, lng: -5.98725,
     desc: "Ancien dépôt de charbon sans enseigne, flamenco live presque tous les soirs, public mélangé et bohème. Sangria médiocre : prenez une bière ou un vin.",
     tip: "Entrée gratuite, concerts vers 22h–23h." },
-  { id: "elarenal", cat: "nuit", name: "Tablao El Arenal (dîner-spectacle)", area: "Arenal", addr: "Calle Rodo 7",
+  { id: "elarenal", cat: "nuit", hours: [{ d:[0,1,2,3,4,5,6], o:"18:00", c:"22:30" }], name: "Tablao El Arenal (dîner-spectacle)", area: "Arenal", addr: "Calle Rodo 7",
     lat: 37.38510, lng: -5.99699,
     desc: "LE tablao de référence pour un repas flamenco (depuis 1976) : vraie troupe chant-guitare-danse, salle voûtée intimiste près de la Maestranza. Le meilleur compromis qualité artistique + dîner en ville.",
     order: "Formule « Flamenco & Tapas » (~71 €) : meilleur rapport que le dîner complet (~86 €). Formule boisson seule : ~45 €.",
@@ -197,6 +198,14 @@ const PLACES = [
     desc: "Le meilleur rapport qualité/prix pour un spectacle flamenco dans un patio de palais, public assis tout près des artistes. Pas de dîner : on tapeo avant/après.",
     tip: "~25 €, réserver en ligne (petite jauge, complet souvent). Combo idéal : spectacle de 19h30 puis dîner tapas.",
     url: "https://www.casadelamemoria.es/" },
+  { id: "neb_donramon", cat: "neb", name: "Hôtel Casa Palacio Don Ramón — cata de vins de Jerez", area: "San Lorenzo", addr: "Calle Trajano 2",
+    lat: 37.393672, lng: -5.995262,
+    desc: "Noche en Blanco : initiation aux vins généreux (fino, amontillado, oloroso, PX) dans un palais-hôtel. Vendredi 20h–21h, 25 €.",
+    tip: "Réservation par téléphone uniquement : 954 32 81 50.", url: "https://nocheenblanco.org/actividad/ramon-cata-de-iniciacion-a-los-vinos-generosos-en-el-hotel-don-ramon/" },
+  { id: "neb_oculta", cat: "neb", name: "« Sevilla Oculta » (départ Puerta de San Miguel)", area: "Cathédrale",
+    lat: 37.385512, lng: -5.993938,
+    desc: "Noche en Blanco : visite nocturne des recoins cachés du centre, 23h30–1h30, 15 €.",
+    tip: "Réservation : 617 20 77 46 ou ispavilia.com.", url: "https://nocheenblanco.org/actividad/ispavilia-sevilla-oculta/" },
   { id: "garlochi", cat: "nuit", name: "El Garlochí", area: "Centro", addr: "Calle Boteros 26",
     lat: 37.39049, lng: -5.98953,
     desc: "Bar baroque-kitsch entièrement décoré en chapelle de Semana Santa, encens et musique cofrade. Expérience unique.",

@@ -13,6 +13,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
   <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Séville">
 </head>
 <body>
   <header class="hero">
@@ -20,16 +24,20 @@
       <p class="kicker">30 septembre → 3 octobre 2026</p>
       <h1>Séville,<br><em>comme un Sévillan</em></h1>
       <p class="lead">Quatre jours à quatre : tapas de quartier, fino bien frais, palais mudéjars, marché aux puces du jeudi et Noche en Blanco.</p>
-      <div class="countdown" id="countdown"></div>
     </div>
   </header>
 
   <nav class="tabs" id="nav">
+    <a href="#now">Maintenant</a>
     <a href="#programme">Programme</a>
     <a href="#carte">Carte</a>
+    <a href="#resa">Résas</a>
+    <a href="#depenses">Dépenses</a>
+    <a href="#album">Album</a>
     <a href="#adresses">Adresses</a>
     <a href="#pratique">Pratique</a>
   </nav>
+  <div id="offline" class="offline" hidden>📴 Hors ligne : affichage de la dernière version enregistrée. Les modifications reprendront au retour du réseau.</div>
 
   <main>
     <section id="login" class="card login" hidden>
@@ -43,13 +51,9 @@
     </section>
     <div class="who-bar"><div id="who"></div><span id="syncInfo" class="muted small"></span></div>
 
-    <section id="feed" class="card feed" hidden></section>
+    <section id="now" class="card now"></section>
 
-    <section id="reserver" class="card todo">
-      <h2>À réserver avant de partir</h2>
-      <p class="muted">Cochez au fur et à mesure (mémorisé sur cet appareil).</p>
-      <ul id="todo"></ul>
-    </section>
+    <section id="feed" class="card feed" hidden></section>
 
     <section id="programme">
       <h2 class="section-title">Programme</h2>
@@ -65,6 +69,22 @@
         <button id="locate" class="btn">📍 Où sommes-nous ?</button>
         <button id="fitAll" class="btn ghost">Tout afficher</button>
       </div>
+    </section>
+
+    <section id="resa">
+      <h2 class="section-title">Réservations</h2>
+      <p class="muted intro">Fiches partagées : statut, horaire, n° de confirmation. Visible uniquement par le groupe (jamais dans le dépôt public).</p>
+      <div id="resaList"></div>
+    </section>
+
+    <section id="depenses">
+      <h2 class="section-title">Dépenses partagées</h2>
+      <div id="expenses"></div>
+    </section>
+
+    <section id="album">
+      <h2 class="section-title">Album</h2>
+      <div id="albumBox"></div>
     </section>
 
     <section id="adresses">
@@ -228,6 +248,35 @@
       </div>
     </form>
   </dialog>
+  <dialog id="histDlg"><div class="dlg-pad"><h3>Historique des modifications</h3><p class="muted small">Chaque modification ou suppression d’étape est conservée. « Restaurer » remet l’étape dans cet état.</p><div id="histList"></div><div class="dlg-actions"><span class="spacer"></span><button class="btn ghost" id="histClose">Fermer</button></div></div></dialog>
+
+  <dialog id="bookDlg">
+    <form id="bookForm" class="dlg-pad form-grid">
+      <h3 id="bookTitle">Réservation</h3>
+      <input type="hidden" name="id">
+      <label>Intitulé<input name="title" maxlength="120" required></label>
+      <div class="row">
+        <label>Jour<select name="day"></select></label>
+        <label>Heure<input name="time" maxlength="20" placeholder="21h30"></label>
+      </div>
+      <div class="row">
+        <label>Personnes<input name="people" type="number" min="1" max="20" value="4"></label>
+        <label>Statut<select name="status"><option>à réserver</option><option>réservé</option><option>complet</option><option>annulé</option></select></label>
+      </div>
+      <label>N° de confirmation<input name="ref" maxlength="120" autocomplete="off"></label>
+      <label>Lien de réservation<input name="url" type="url" maxlength="400" placeholder="https://…"></label>
+      <label>Lieu sur la carte<select name="place"></select></label>
+      <label>Notes<textarea name="notes" rows="2" maxlength="1000"></textarea></label>
+      <div class="dlg-actions"><button type="button" class="btn danger" id="bookDel">Supprimer</button><span class="spacer"></span>
+        <button type="button" class="btn ghost" id="bookCancel">Annuler</button><button class="btn">Enregistrer</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="photoDlg" class="photo-dlg"><div class="dlg-pad"><img id="photoFull" alt=""><p id="photoCap" class="muted small"></p>
+    <div class="dlg-actions"><button class="btn danger" id="photoDel" hidden>Supprimer ma photo</button><span class="spacer"></span><button class="btn ghost" id="photoClose">Fermer</button></div></div></dialog>
+
+  <input type="file" id="photoInput" accept="image/*" multiple hidden>
+  <div id="printArea"></div>
   <div id="toast" role="status" aria-live="polite"></div>
 
   <footer>
@@ -237,5 +286,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script src="data.js"></script>
   <script src="app.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  </script>
 </body>
 </html>
