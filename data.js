@@ -186,6 +186,17 @@ const PLACES = [
     lat: 37.38776, lng: -5.98725,
     desc: "Ancien dépôt de charbon sans enseigne, flamenco live presque tous les soirs, public mélangé et bohème. Sangria médiocre : prenez une bière ou un vin.",
     tip: "Entrée gratuite, concerts vers 22h–23h." },
+  { id: "elarenal", cat: "nuit", name: "Tablao El Arenal (dîner-spectacle)", area: "Arenal", addr: "Calle Rodo 7",
+    lat: 37.38510, lng: -5.99699,
+    desc: "LE tablao de référence pour un repas flamenco (depuis 1976) : vraie troupe chant-guitare-danse, salle voûtée intimiste près de la Maestranza. Le meilleur compromis qualité artistique + dîner en ville.",
+    order: "Formule « Flamenco & Tapas » (~71 €) : meilleur rapport que le dîner complet (~86 €). Formule boisson seule : ~45 €.",
+    tip: "Réserver en direct sur le site officiel (pas via revendeurs), 2 services par soir. Arriver 45 min avant pour le repas, spectacle ~1h. Prix hors TVA.",
+    url: "https://tablaoelarenal.com/en/" },
+  { id: "memoria", cat: "nuit", name: "Casa de la Memoria (spectacle seul)", area: "Centro", addr: "Calle Cuna 6",
+    lat: 37.39249, lng: -5.99369,
+    desc: "Le meilleur rapport qualité/prix pour un spectacle flamenco dans un patio de palais, public assis tout près des artistes. Pas de dîner : on tapeo avant/après.",
+    tip: "~25 €, réserver en ligne (petite jauge, complet souvent). Combo idéal : spectacle de 19h30 puis dîner tapas.",
+    url: "https://www.casadelamemoria.es/" },
   { id: "garlochi", cat: "nuit", name: "El Garlochí", area: "Centro", addr: "Calle Boteros 26",
     lat: 37.39049, lng: -5.98953,
     desc: "Bar baroque-kitsch entièrement décoré en chapelle de Semana Santa, encens et musique cofrade. Expérience unique.",
@@ -258,6 +269,7 @@ const TODO = [
   { id: "t5", text: "Noche en Blanco — réserver les activités payantes/limitées (dès publication du programme)", url: "https://nocheenblanco.org/" },
   { id: "t6", text: "Prévenir l’hôte de l’heure d’arrivée mercredi soir", url: null },
   { id: "t7", text: "Setas de Sevilla — billet coucher de soleil jeudi (facultatif)", url: null },
+  { id: "t9", text: "Option flamenco : si le groupe vote pour, réserver Tablao El Arenal (jeudi 21h30) ou Casa de la Memoria", url: "https://tablaoelarenal.com/en/" },
   { id: "t8", text: "Retirer un peu d’espèces (marché du jeudi, petits bars)", url: null }
 ];
 
