@@ -1,4 +1,4 @@
-# Séville · 30 sept – 3 oct 2026
+# Puechoultres & Devesa à Séville · 30 sept – 3 oct 2026
 
 Guide de voyage collaboratif (GitHub Pages) : https://qevedeveq-art.github.io/seville/
 

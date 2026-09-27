@@ -788,7 +788,7 @@
     toast("Préparation du carnet…", 6000);
     await loadThumbs();
     const bal = balances(), total = S("expenses").reduce((s, e) => s + +e.amount, 0);
-    $("#printArea").innerHTML = `<div class="print-doc"><h1>Séville · 30 sept – 3 oct 2026</h1><p class="small">Carnet généré le ${new Date().toLocaleDateString("fr-FR")} · ${members().map(esc).join(", ")}</p>
+    $("#printArea").innerHTML = `<div class="print-doc"><h1>Puechoultres &amp; Devesa à Séville</h1><p>30 sept – 3 oct 2026</p><p class="small">Carnet généré le ${new Date().toLocaleDateString("fr-FR")} · ${members().map(esc).join(", ")}</p>
       ${DAYS.map(d => {
         const items = itemsForDay(d.key).filter(it => voteStatus(it.id).s !== "ko");
         const dayPhotos = S("photos").filter(p => targetDay(p.target) === d.key);
