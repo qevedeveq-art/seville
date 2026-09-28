@@ -17,6 +17,7 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="P&amp;D Séville">
+  <script>window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();window.__bip=e;document.dispatchEvent(new Event("bip"));});</script>
 </head>
 <body>
   <header class="hero" data-view="accueil">
@@ -38,6 +39,11 @@
   <div id="offline" class="offline" hidden>📴 Hors ligne : affichage de la dernière version enregistrée. Les modifications reprendront au retour du réseau.</div>
 
   <main>
+    <div id="installBar" class="install-bar" hidden>
+      <span>📲</span><div><b>Mettre l’appli sur l’écran d’accueil</b><small>Ouverture en un clic, plein écran, marche hors ligne</small></div>
+      <button class="btn sm" data-install>Installer</button><button class="link x" id="installLater" aria-label="Plus tard">✕</button>
+    </div>
+
     <section id="login" class="card login" hidden>
       <h2>Qui êtes-vous ?</h2>
       <p class="muted">Entrez votre prénom et le code du groupe pour proposer, modifier, réagir et commenter. À faire une seule fois par téléphone.</p>
@@ -78,6 +84,7 @@
     <section id="plus" data-view="plus">
       <h2 class="section-title">Plus</h2>
       <div class="plus-menu">
+        <a href="#" data-install class="install-item" hidden><span>📲</span><b>Installer l’appli</b><small>Sur l’écran d’accueil Android ou iPhone</small></a>
         <a href="#journal" data-go="journal"><span>🕘</span><b>Journal</b><small>Qui a fait quoi, annuler une action</small></a>
         <a href="#depenses" data-go="depenses"><span>💶</span><b>Dépenses</b><small>Qui a payé, qui doit combien</small></a>
         <a href="#album" data-go="album"><span>📸</span><b>Album</b><small>Photos du groupe, téléchargement</small></a>
@@ -251,6 +258,12 @@
       </div>
     </section>
   </main>
+
+  <dialog id="installDlg"><div class="dlg-pad">
+    <h3>📲 Ajouter à l’écran d’accueil</h3>
+    <div id="installSteps"></div>
+    <div class="dlg-actions"><span class="spacer"></span><button class="btn" id="installOk">OK</button></div>
+  </div></dialog>
 
   <dialog id="editor">
     <form id="editForm" method="dialog">

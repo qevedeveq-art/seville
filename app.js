@@ -1230,6 +1230,7 @@
     if (!opts || !opts.keepHash) history.replaceState(null, "", "#" + v);
     if (v === "carte") setTimeout(() => map.invalidateSize(), 60);
     if (v === "journal") loadJournal();
+    renderInstall();
     window.scrollTo({ top: 0 });
   }
   const backBar = document.createElement("div");
@@ -1319,6 +1320,47 @@
     if (h) { journalFilter = { who: "", kind: "", item: h.dataset.hist }; if (dlg.open) dlg.close(); go("journal"); }
   });
 
+
+  /* ================================================================
+     v6 — Bouton « Installer l’appli » (Android / iPhone)
+     ================================================================ */
+  const ua = navigator.userAgent;
+  const isIOS = /iphone|ipad|ipod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const isIOSSafari = isIOS && !/crios|fxios|edgios|opios|gsa\//i.test(ua);
+  const isAndroid = /android/i.test(ua);
+  const isInstalled = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  function renderInstall() {
+    const show = !isInstalled();
+    document.querySelectorAll(".install-item").forEach(el => { el.hidden = !show; });
+    const bar = $("#installBar");
+    let later = 0; try { later = +localStorage.getItem("sev_install_later") || 0; } catch (e) {}
+    bar.hidden = !show || (Date.now() - later < 3 * 864e5) || view !== "accueil";
+    bar.dataset.ok = show ? "1" : "";
+  }
+  function installSteps() {
+    const share = `<b class="ico">⬆︎</b>`;
+    if (isIOS && !isIOSSafari) return `<p>Sur iPhone, l’ajout se fait depuis <b>Safari</b>.</p><ol><li>Copiez l’adresse de la page (ou le lien reçu) et ouvrez-la dans <b>Safari</b>.</li><li>Puis suivez les étapes : Partager ${share} → « Sur l’écran d’accueil ».</li></ol>`;
+    if (isIOS) return `<ol class="isteps"><li>Touchez le bouton <b>Partager</b> ${share} en bas de Safari (en haut sur iPad).</li><li>Faites défiler et choisissez <b>« Sur l’écran d’accueil »</b> ➕.</li><li>Touchez <b>Ajouter</b> en haut à droite.</li></ol><p class="muted small">L’icône « P&amp;D Séville » apparaît sur l’écran d’accueil. Votre prénom est conservé.</p>`;
+    if (isAndroid) return `<ol class="isteps"><li>Ouvrez le menu <b>⋮</b> de Chrome (en haut à droite).</li><li>Choisissez <b>« Installer l’application »</b> ou <b>« Ajouter à l’écran d’accueil »</b>.</li><li>Confirmez avec <b>Installer</b>.</li></ol><p class="muted small">Sur Samsung Internet : menu ☰ → « Ajouter la page à » → « Écran d’accueil ».</p>`;
+    return `<p>Sur ordinateur (Chrome ou Edge) : cliquez sur l’icône d’installation ⊕ à droite de la barre d’adresse, ou menu ⋮ → « Installer… ».</p><p class="muted small">Sur téléphone, ouvrez ce lien dans Chrome (Android) ou Safari (iPhone).</p>`;
+  }
+  document.addEventListener("click", async e => {
+    const b = e.target.closest("[data-install]"); if (!b) return;
+    e.preventDefault();
+    if (window.__bip) {
+      const p = window.__bip; window.__bip = null;
+      p.prompt();
+      try { const r = await p.userChoice; if (r.outcome === "accepted") toast("Appli installée 🎉"); } catch (err) {}
+      renderInstall(); return;
+    }
+    $("#installSteps").innerHTML = installSteps();
+    $("#installDlg").showModal();
+  });
+  $("#installOk").onclick = () => $("#installDlg").close();
+  $("#installLater").onclick = () => { try { localStorage.setItem("sev_install_later", Date.now()); } catch (e) {} $("#installBar").hidden = true; };
+  document.addEventListener("bip", renderInstall);
+  window.addEventListener("appinstalled", () => { window.__bip = null; renderInstall(); toast("Appli installée 🎉"); });
+
   /* ================================================================
      Rendu global + démarrage
      ================================================================ */
@@ -1326,6 +1368,7 @@
   renderWho();
   renderAll();
   go(VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "accueil", { keepHash: true });
+  renderInstall();
   loadWeather();
   if (me) refresh();
 })();

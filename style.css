@@ -346,3 +346,15 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
 #editInfo{margin:-6px 0 0}
 
 .back-bar[hidden]{display:none !important}
+
+/* v6 — installation */
+.install-bar{display:grid; grid-template-columns:34px 1fr auto auto; gap:10px; align-items:center; background:var(--surface); border:1px solid var(--line); border-left:4px solid var(--almagra); border-radius:14px; padding:10px 12px; margin:0 0 12px}
+.install-bar[hidden], .install-item[hidden]{display:none !important}
+.install-bar > span{font-size:1.6rem; text-align:center}
+.install-bar b{display:block}
+.install-bar small{color:var(--muted); font-size:.85rem}
+.install-bar .x{font-size:1.1rem; padding:4px 6px; color:var(--muted)}
+.isteps{padding-left:1.2em; line-height:1.6}
+.isteps li{margin:.4em 0}
+.ico{display:inline-block; border:1px solid var(--line,#ccc); border-radius:6px; padding:0 6px; color:#0a84ff}
+@media print{.install-bar{display:none !important}}
