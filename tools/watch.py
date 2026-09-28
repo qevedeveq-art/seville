@@ -56,7 +56,15 @@ def main():
                lambda: [covermanager("restaurante-sobretablas", "03-10-2026", "sobretablas_3_midi", "Sobretablas sam. 3 — déjeuner", lambda h: h < "17:00")]):
         try: res += fn()
         except Exception as e: errors.append(str(e)[:200])
-    print(json.dumps(res, ensure_ascii=False))
+    import os
+    code = os.environ.get("SEV_CODE")
+    if code and res:
+        # Enregistre directement dans l'appli (RPC protégée par le code du groupe)
+        changes = http("https://qkpswqiqytlsdwsuxmkg.supabase.co/rest/v1/rpc/guide_watch_update",
+                       {"p_code": code, "p": res}, headers={"apikey": "sb_publishable_aYy-pIs3DVA93hzVKWbsWw_wsAXCh4I"})
+        print(json.dumps({"saved": True, "changes": changes, "results": res}, ensure_ascii=False))
+    else:
+        print(json.dumps(res, ensure_ascii=False))
     if errors: print("ERREURS: " + " | ".join(errors), file=sys.stderr)
 
 if __name__ == "__main__":
