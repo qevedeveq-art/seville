@@ -395,3 +395,24 @@ html.eco .hero{background:#1b1512 !important}
 /* récap */
 .recap textarea{width:100%; font:14px/1.45 Inter,system-ui,sans-serif; border:1px solid var(--line); border-radius:10px; padding:10px; background:var(--bg); color:var(--ink)}
 .recap .seg{margin:6px 0 10px}
+
+/* v8 — positions en direct + export Google Maps */
+.pos-icon{overflow:visible}
+.pos-wrap{position:relative; width:34px; height:34px}
+.pos-wrap.stale{opacity:.55; filter:grayscale(.6)}
+.pos-name{position:absolute; top:36px; left:50%; transform:translateX(-50%); white-space:nowrap; background:#fff; color:#221a14; font:700 12px/1.2 Inter,sans-serif; padding:2px 7px; border-radius:999px; box-shadow:0 1px 4px rgba(0,0,0,.35)}
+.people{margin:10px 0}
+.people-head{margin-bottom:6px}
+.person{display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--line)}
+.person > div{flex:1}
+.person.stale{opacity:.6}
+.people-empty{margin:6px 0}
+#shareBtn.sharing{background:#1a73e8; color:#fff; border-color:#1a73e8}
+.share-choices{display:grid; gap:8px; margin:12px 0}
+.gexp > .btn{display:block; text-align:center; margin:8px 0}
+.gexp-list{padding-left:1.2em}
+.gexp-list li{margin:10px 0}
+.gexp-list .btn{display:inline-block; margin-bottom:4px}
+.gexp details{margin:12px 0; border:1px solid var(--line); border-radius:10px; padding:8px 12px}
+.gexp summary{cursor:pointer; font-weight:600}
+.day-actions{display:flex; flex-wrap:wrap; gap:8px}

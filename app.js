@@ -463,7 +463,7 @@
     pts.forEach((x, i) => L.marker([x.p.lat, x.p.lng], { zIndexOffset: 2000, icon: L.divIcon({ className: "", iconSize: [24, 24], iconAnchor: [12, 12], html: `<div class="route-num">${i + 1}</div>` }) })
       .bindPopup(`<strong>${i + 1}. ${esc(x.it.time_label)}</strong> — ${esc(x.p.name)}`).addTo(routeLayer));
     let km = 0; for (let i = 1; i < ll.length; i++) km += distKm(ll[i - 1], ll[i]);
-    routeInfo.textContent = `${dayName(key)} : ${pts.length} étapes · ≈ ${(km * 1.3).toFixed(1)} km à pied (~${Math.round(walkMin(km) / 5) * 5} min de marche au total, hors taxi).`;
+    routeInfo.innerHTML = `${esc(dayName(key))} : ${pts.length} étapes · ≈ ${(km * 1.3).toFixed(1)} km à pied (~${Math.round(walkMin(km) / 5) * 5} min de marche au total, hors taxi). <button class="link" data-gexport="${key}">🧭 Ouvrir dans Google Maps</button>`;
     map.fitBounds(L.latLngBounds(ll), { padding: [30, 30] });
   }
 
@@ -541,7 +541,7 @@
     const items = [...itemsForDay(d.key), ...flightItems(d.key)].sort((x, y) => timeKey(x.time_label) - timeKey(y.time_label)), tips = DAY_TIPS[d.key];
     panel.innerHTML = `<div class="day-head"><div><h3>${esc(d.title)}</h3><p class="mood">${esc(d.mood)}</p></div>${weatherHtml(d.key, true)}</div>
       ${me ? "" : `<p class="notice">👋 Identifiez-vous en haut de page pour modifier le programme, voter, commenter et partager des photos.</p>`}
-      <div class="day-actions"><button class="btn sm ghost" data-route="${d.key}">🗺 Itinéraire du jour</button></div>
+      <div class="day-actions"><button class="btn sm ghost" data-route="${d.key}">🗺 Itinéraire du jour</button><button class="btn sm ghost" data-gexport="${d.key}">🧭 Ouvrir dans Google Maps</button></div>
       <ol class="timeline">${items.map(it => {
         const pg = pollById(it.id);
         if (pg && !pg.decided) { if (shownPolls.has(pg.key)) return ""; shownPolls.add(pg.key); return pollLi(pg); }
@@ -1088,41 +1088,108 @@
       <ul class="phr">${PHRASES.map(([es, fr]) => `<li><button class="say" data-say="${esc(es)}">🔊</button><div><strong>${esc(es)}</strong><div class="small muted">${esc(fr)}</div></div></li>`).join("")}</ul>`;
   }
 
-  /* ---------- Positions partagées ---------- */
+  /* ---------- Positions partagées (temps réel) ---------- */
   const posLayer = L.layerGroup().addTo(map);
-  let posWatch = null, lastSent = 0, sharingUntil = store.get("sev-share-until", 0);
-  async function startSharing() {
+  const posMarkers = {};
+  let posWatch = null, lastSent = 0, lastSentPos = null, sharingUntil = store.get("sev-share-until", 0);
+  const endOfNight = () => { const m = madridNow().min, left = m < 240 ? 240 - m : 1440 + 240 - m; return Date.now() + Math.min(left, 720) * 60000; };
+  function askShare() {
+    if (!me) return toast("Identifiez-vous d’abord.");
+    const d = document.createElement("dialog");
+    d.innerHTML = `<div class="dlg-pad"><h3>📡 Partager ma position</h3>
+      <p class="muted small">Votre point apparaît avec votre prénom sur la carte des 3 autres, mis à jour en continu tant que l’appli est ouverte. Arrêt automatique à la fin de la durée choisie.</p>
+      <div class="share-choices"><button class="btn" data-min="60">1 heure</button><button class="btn" data-min="180">3 heures</button><button class="btn" data-min="night">Toute la soirée (jusqu’à 4h)</button></div>
+      <div class="dlg-actions"><span class="spacer"></span><button class="btn ghost" data-close>Annuler</button></div></div>`;
+    document.body.appendChild(d);
+    d.addEventListener("click", e => {
+      const b = e.target.closest("[data-min]");
+      if (b) { d.close(); startSharing(b.dataset.min === "night" ? endOfNight() : Date.now() + +b.dataset.min * 60000); }
+      if (e.target.closest("[data-close]")) d.close();
+    });
+    d.addEventListener("close", () => d.remove()); d.showModal();
+  }
+  async function sendPos(acc) {
+    lastSent = Date.now(); lastSentPos = myPos;
+    try { await rpc("guide_share_pos", { p_author: me.name, p_lat: myPos[0], p_lng: myPos[1], p_acc: acc || null, p_minutes: Math.max(5, Math.round((sharingUntil - Date.now()) / 60000)) }); }
+    catch (err) { toast(/check constraint|lat|lng/.test(err.message) ? "Vous n’êtes pas à Séville : position non partagée." : err.message, 4000); stopSharing(); }
+  }
+  function startSharing(until) {
     if (!me) return toast("Identifiez-vous d’abord.");
     if (!navigator.geolocation) return toast("Géolocalisation indisponible.");
-    sharingUntil = Date.now() + 2 * 3600e3; store.set("sev-share-until", sharingUntil);
-    posWatch = navigator.geolocation.watchPosition(async p => {
+    const resume = !until; if (until) { sharingUntil = until; store.set("sev-share-until", sharingUntil); }
+    if (posWatch != null) navigator.geolocation.clearWatch(posWatch);
+    lastSent = 0;
+    posWatch = navigator.geolocation.watchPosition(p => {
       myPos = [p.coords.latitude, p.coords.longitude];
       if (Date.now() > sharingUntil) return stopSharing();
-      if (Date.now() - lastSent < 55000) return;
-      lastSent = Date.now();
-      try { await rpc("guide_share_pos", { p_author: me.name, p_lat: myPos[0], p_lng: myPos[1], p_acc: p.coords.accuracy, p_minutes: Math.round((sharingUntil - Date.now()) / 60000) }); }
-      catch (err) { toast(/check constraint|lat|lng/.test(err.message) ? "Vous n’êtes pas à Séville : position non partagée." : err.message, 4000); stopSharing(); }
-    }, () => { toast("Position non disponible."); stopSharing(); }, { enableHighAccuracy: true, maximumAge: 30000, timeout: 20000 });
-    renderShareBtn(); toast("📡 Position partagée avec le groupe pendant 2 h");
+      const moved = lastSentPos ? distKm(lastSentPos, myPos) * 1000 : 1e9;
+      if (Date.now() - lastSent > 60000 || (moved > 20 && Date.now() - lastSent > 12000)) sendPos(p.coords.accuracy);
+      renderPositions();
+    }, err => {
+      if (err && err.code === 1) { toast("Localisation refusée : autorisez-la dans les réglages du téléphone."); stopSharing(); }
+      // délai dépassé / signal perdu : on garde le partage actif, la prochaine position sera envoyée
+    }, { enableHighAccuracy: true, maximumAge: 10000 });
+    renderShareBtn();
+    if (!resume) toast(`📡 Position partagée jusqu’à ${new Date(sharingUntil).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`);
   }
   async function stopSharing() {
     if (posWatch != null) navigator.geolocation.clearWatch(posWatch); posWatch = null;
-    sharingUntil = 0; store.set("sev-share-until", 0); lastSent = 0;
+    sharingUntil = 0; store.set("sev-share-until", 0); lastSent = 0; lastSentPos = null;
     try { if (me) await rpc("guide_stop_pos", { p_author: me.name }); } catch (e) {}
     renderShareBtn(); refresh(true);
   }
   const shareBtn = document.createElement("button"); shareBtn.className = "btn ghost"; shareBtn.id = "shareBtn";
-  shareBtn.onclick = () => posWatch != null ? stopSharing() : startSharing();
+  shareBtn.onclick = () => posWatch != null ? stopSharing() : askShare();
   $(".map-actions").appendChild(shareBtn);
-  function renderShareBtn() { shareBtn.textContent = posWatch != null ? "📡 Arrêter le partage" : "📡 Où êtes-vous ? (partager 2 h)"; shareBtn.classList.toggle("sharing", posWatch != null); }
-  function renderPositions() {
-    posLayer.clearLayers();
-    S("positions").filter(p => !me || !same(p.author, me.name)).forEach(p => {
-      L.marker([p.lat, p.lng], { zIndexOffset: 3000, icon: L.divIcon({ className: "", iconSize: [34, 34], iconAnchor: [17, 17], html: `<div class="pos-pin" style="background:${colorOf(p.author)}">${esc(p.author[0].toUpperCase())}</div>` }) })
-        .bindPopup(`<strong>${esc(p.author)}</strong><br><span class="small">${ago(p.updated_at)}${myPos ? ` · ${walkMin(distKm(myPos, [p.lat, p.lng]))} min à pied` : ""}</span><br><a href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}&travelmode=walking" target="_blank" rel="noopener">Le/la rejoindre</a>`)
-        .addTo(posLayer);
-    });
+  const peopleBox = document.createElement("div"); peopleBox.id = "peopleBox"; peopleBox.className = "people"; $("#map").after(peopleBox);
+  function renderShareBtn() {
+    shareBtn.textContent = posWatch != null ? `📡 Je partage jusqu’à ${new Date(sharingUntil).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} · Arrêter` : "📡 Partager ma position";
+    shareBtn.classList.toggle("sharing", posWatch != null);
   }
+  const agoShort = iso => { const s = Math.max(0, (Date.now() - new Date(iso)) / 1000); return s < 45 ? "à l’instant" : s < 3600 ? `il y a ${Math.round(s / 60)} min` : `il y a ${Math.floor(s / 3600)} h`; };
+  function posIcon(name, color, stale, label) {
+    return L.divIcon({ className: "pos-icon", iconSize: [34, 34], iconAnchor: [17, 17],
+      html: `<div class="pos-wrap ${stale ? "stale" : ""}"><div class="pos-pin" style="background:${color}">${esc(name[0].toUpperCase())}</div><div class="pos-name">${esc(label)}</div></div>` });
+  }
+  function renderPositions() {
+    const list = S("positions").filter(p => !me || !same(p.author, me.name));
+    const keep = new Set();
+    list.forEach(p => {
+      const k = p.author.toLowerCase(), ll = [p.lat, p.lng], stale = Date.now() - new Date(p.updated_at) > 5 * 60000;
+      keep.add(k);
+      const icon = posIcon(p.author, colorOf(p.author), stale, `${p.author} · ${agoShort(p.updated_at).replace("il y a ", "")}`);
+      const pop = `<strong>${esc(p.author)}</strong><br><span class="small">${agoShort(p.updated_at)}${myPos ? ` · ${walkMin(distKm(myPos, ll))} min à pied` : ""}${p.acc ? ` · ±${Math.round(p.acc)} m` : ""}</span><br><a href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}&travelmode=walking" target="_blank" rel="noopener">🧭 Le/la rejoindre (Google Maps)</a>`;
+      if (posMarkers[k]) { posMarkers[k].setLatLng(ll).setIcon(icon); posMarkers[k].setPopupContent(pop); }
+      else posMarkers[k] = L.marker(ll, { zIndexOffset: 3000, icon }).bindPopup(pop).addTo(posLayer);
+    });
+    if (me && myPos && posWatch != null) {
+      keep.add("__me");
+      const icon = posIcon(me.name, "#1a73e8", false, "Moi");
+      if (posMarkers.__me) posMarkers.__me.setLatLng(myPos).setIcon(icon); else posMarkers.__me = L.marker(myPos, { zIndexOffset: 2900, icon }).bindPopup("Vous (position partagée)").addTo(posLayer);
+    }
+    Object.keys(posMarkers).forEach(k => { if (!keep.has(k)) { posLayer.removeLayer(posMarkers[k]); delete posMarkers[k]; } });
+    // Liste sous la carte
+    if (!me) { peopleBox.innerHTML = ""; return; }
+    peopleBox.innerHTML = list.length ? `<div class="people-head"><b>👥 En direct</b>${list.length + (myPos ? 1 : 0) > 1 ? ` <button class="link" data-pos-all>voir tout le monde</button>` : ""}</div>
+      ${list.map(p => { const ll = [p.lat, p.lng]; return `<div class="person ${Date.now() - new Date(p.updated_at) > 5 * 60000 ? "stale" : ""}">${avatar(p.author, true)}<div><b>${esc(p.author)}</b> <span class="small muted">${agoShort(p.updated_at)}${myPos ? ` · ${walkMin(distKm(myPos, ll))} min à pied` : ""}</span></div>
+        <button class="btn sm ghost" data-pos="${esc(p.author)}">Voir</button><a class="btn sm ghost" href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}&travelmode=walking" target="_blank" rel="noopener">🧭 Rejoindre</a></div>`; }).join("")}`
+      : `<p class="small muted people-empty">Personne ne partage sa position pour l’instant. ${posWatch != null ? "" : "Touchez « 📡 Partager ma position » pour apparaître sur la carte des autres."}</p>`;
+  }
+  document.addEventListener("click", e => {
+    if (!e.target.closest("[data-pos-all]")) return;
+    const pts = S("positions").map(p => [p.lat, p.lng]); if (myPos) pts.push(myPos);
+    if (pts.length) map.fitBounds(L.latLngBounds(pts), { padding: [40, 40], maxZoom: 17 });
+  });
+  // Rafraîchissement rapide des positions (toutes les 10 s sur Carte / Aujourd’hui)
+  let posBusy = false;
+  setInterval(async () => {
+    if (!me || posBusy || document.visibilityState !== "visible" || !["carte", "accueil"].includes(view)) return;
+    if (posWatch == null && !S("positions").length) return;
+    if (ecoOn() && view !== "carte") return;
+    posBusy = true;
+    try { const ps = await rpc("guide_positions"); if (state) { state.positions = ps; renderPositions(); } } catch (e) {} finally { posBusy = false; }
+  }, 10000);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && posWatch != null && myPos && Date.now() - lastSent > 20000) sendPos(); });
   if (sharingUntil > Date.now() && me) startSharing(); else renderShareBtn();
 
   /* ---------- Dégustations ---------- */
@@ -1496,6 +1563,7 @@
     const box = $("#now"), n = madridNow();
     if (jjNow && me) {
       const extra = [];
+      if (gmStops(jjNow.k, jjNow.nm).length) extra.push(`<button class="btn sm ghost" data-gnext="${jjNow.k}">🧭 La suite dans Google Maps</button>`);
       if (jjNow.nm >= 18 * 60) extra.push(`<button class="btn sm ghost" data-recap="${jjNow.k}">🌙 Récap du jour à partager</button>`);
       if (jjNow.k === "ven" && jjNow.nm >= 19 * 60 && !ecoOn()) extra.push(`<button class="btn sm ghost" data-eco-on>🔋 Économie de batterie pour la nuit</button>`);
       if (extra.length) box.insertAdjacentHTML("beforeend", `<div class="now-links">${extra.join("")}</div>`);
@@ -1578,6 +1646,74 @@
   });
   $("#ecoToggle").addEventListener("change", e => { store.set("sev-eco", e.target.checked); applyTheme(); renderNow(); toast(e.target.checked ? "🔋 Économie de batterie activée" : "Économie de batterie désactivée"); });
   applyTheme();
+
+
+  /* ================================================================
+     v8 — Export des itinéraires vers Google Maps (+ KML pour My Maps)
+     ================================================================ */
+  function gmStops(key, afterMin) {
+    const out = [];
+    collapsePolls(itemsForDay(key)).filter(it => it.place_id && byId[it.place_id] && voteStatus(it.id).s !== "ko")
+      .filter(it => afterMin == null || timeKey(it.time_label) > afterMin)
+      .forEach(it => { const p = byId[it.place_id]; if (!out.length || out[out.length - 1].p.id !== p.id) out.push({ p, it }); });
+    return out;
+  }
+  const ll = x => `${x.p.lat},${x.p.lng}`;
+  function gmUrl(stops, fromHere) {
+    const u = new URLSearchParams({ api: "1", travelmode: "walking" });
+    const dest = stops[stops.length - 1], mid = fromHere ? stops.slice(0, -1) : stops.slice(1, -1);
+    if (!fromHere) u.set("origin", ll(stops[0]));
+    u.set("destination", ll(dest));
+    if (mid.length) u.set("waypoints", mid.map(ll).join("|"));
+    return "https://www.google.com/maps/dir/?" + u.toString();
+  }
+  // Google Maps sur mobile accepte ~3 étapes intermédiaires : on découpe par tronçons de 5 lieux (qui se chevauchent)
+  function gmChunks(stops) {
+    if (stops.length <= 5) return [stops];
+    const out = []; for (let i = 0; i < stops.length - 1; i += 4) out.push(stops.slice(i, i + 5));
+    return out;
+  }
+  const stopName = x => `${x.it.time_label} ${x.p.name}`;
+  function openGExport(key) {
+    const stops = gmStops(key);
+    if (!stops.length) return toast("Aucun lieu placé ce jour-là.");
+    const chunks = gmChunks(stops), n = madridNow(), today = jjNow && jjNow.k === key;
+    const rest = today ? gmStops(key, jjNow.nm).slice(0, 4) : [];
+    const d = document.createElement("dialog");
+    d.innerHTML = `<div class="dlg-pad gexp"><h3>🧭 ${esc(dayName(key))} dans Google Maps</h3>
+      <p class="muted small">Itinéraire à pied, lieux dans l’ordre du programme. Google Maps limite le nombre d’arrêts sur téléphone : la journée est découpée en ${chunks.length > 1 ? chunks.length + " tronçons" : "un seul trajet"}.</p>
+      ${rest.length ? `<a class="btn" href="${gmUrl(rest, true)}" target="_blank" rel="noopener">📍 Depuis ma position → ${esc(rest.map(x => x.p.name).join(" → "))}</a>` : ""}
+      <ol class="gexp-list">${chunks.map((c, i) => `<li><a class="btn ${rest.length ? "ghost" : ""}" href="${gmUrl(c)}" target="_blank" rel="noopener">${chunks.length > 1 ? `Tronçon ${i + 1} · ` : ""}${esc(c[0].it.time_label)} → ${esc(c[c.length - 1].it.time_label)}</a>
+        <div class="small muted">${c.map(x => esc(stopName(x))).join(" → ")}</div></li>`).join("")}</ol>
+      <details><summary>⬇️ Tout le voyage dans « Mes cartes » Google</summary>
+        <p class="small">Téléchargez le fichier, puis sur ordinateur : <a href="https://www.google.com/maps/d/" target="_blank" rel="noopener">google.com/maps/d</a> → <b>Créer une carte</b> → <b>Importer</b> → choisir le fichier. La carte apparaît ensuite dans l’appli Google Maps (Vous → Enregistrés → Cartes), avec un calque par jour.</p>
+        <button class="btn sm" data-kml>⬇️ Télécharger le fichier (KML)</button></details>
+      <div class="dlg-actions"><span class="spacer"></span><button class="btn ghost" data-close>Fermer</button></div></div>`;
+    document.body.appendChild(d);
+    d.addEventListener("click", e => { if (e.target.closest("[data-close]")) d.close(); if (e.target.closest("[data-kml]")) downloadKml(); });
+    d.addEventListener("close", () => d.remove()); d.showModal();
+  }
+  function downloadKml() {
+    const x = s => esc(s);
+    const colors = { mer: "ff2b45b5", jeu: "ff8b5f1f", ven: "ff3ba9e3", sam: "ff4f7d2f" };
+    const folders = DAY_KEYS.map(k => {
+      const st = gmStops(k); if (!st.length) return "";
+      return `<Folder><name>${x(dayName(k))}</name>
+${st.map((s, i) => `<Placemark><name>${i + 1}. ${x(s.it.time_label)} — ${x(s.p.name)}</name><description>${x((s.it.body || "").replace(/^🗳\s*/, ""))}${s.it.tip ? "\n💡 " + x(s.it.tip) : ""}</description><styleUrl>#p-${k}</styleUrl><Point><coordinates>${s.p.lng},${s.p.lat},0</coordinates></Point></Placemark>`).join("\n")}
+${st.length > 1 ? `<Placemark><name>Itinéraire ${x(dayName(k))}</name><styleUrl>#l-${k}</styleUrl><LineString><tessellate>1</tessellate><coordinates>${st.map(s => `${s.p.lng},${s.p.lat},0`).join(" ")}</coordinates></LineString></Placemark>` : ""}
+</Folder>`;
+    }).join("\n");
+    const styles = DAY_KEYS.map(k => `<Style id="p-${k}"><IconStyle><color>${colors[k] || "ff2b45b5"}</color></IconStyle></Style><Style id="l-${k}"><LineStyle><color>${colors[k] || "ff2b45b5"}</color><width>4</width></LineStyle></Style>`).join("");
+    const kml = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Puechoultres &amp; Devesa à Séville</name>${styles}\n${folders}\n</Document></kml>`;
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([kml], { type: "application/vnd.google-earth.kml+xml" }));
+    a.download = "seville-itineraires.kml"; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    toast("Fichier KML téléchargé ✔");
+  }
+  document.addEventListener("click", e => {
+    const g = e.target.closest("[data-gexport]"); if (g) { e.preventDefault(); return openGExport(g.dataset.gexport); }
+    const nx = e.target.closest("[data-gnext]");
+    if (nx && jjNow) { const st = gmStops(nx.dataset.gnext, jjNow.nm).slice(0, 4); if (st.length) window.open(gmUrl(st, true), "_blank", "noopener"); }
+  });
 
   /* ================================================================
      Rendu global + démarrage
