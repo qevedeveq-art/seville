@@ -1025,7 +1025,7 @@
   function watchPanel() {
     const w = S("watch"); if (!w.length) return "";
     const last = w.reduce((m, x) => x.checked_at > m ? x.checked_at : m, "");
-    return `<div class="card watch"><h3>🔔 Veille des places <span class="muted small">· vérifiée ${ago(last)} · toutes les 2 h</span></h3>
+    return `<div class="card watch"><h3>🔔 Veille des places <span class="muted small">· vérifiée ${ago(last)} · toutes les heures</span></h3>
       <ul>${w.map(x => `<li><span class="wbadge ${x.status}">${x.status === "dispo" ? "dispo" : "complet"}</span> <strong>${esc(x.label)}</strong>
         <div class="small muted">${esc(x.detail || "")}${x.status === "dispo" && x.changed_at && Date.now() - new Date(x.changed_at) < 6 * 3600e3 ? " · <b>nouveau</b>" : ""}</div></li>`).join("")}</ul>
       <p class="small muted">Les créneaux libérés sont signalés ici et par notification. Réservez sur le site officiel.</p></div>`;
