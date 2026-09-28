@@ -321,10 +321,10 @@
     const ed = t.closest("[data-edit]"); if (ed) { openEditor(ed.dataset.edit); return; }
     const add = t.closest("[data-add]"); if (add) { openEditor(null, add.dataset.add); return; }
     const sm = t.closest("[data-map]"); if (sm) { showOnMap(sm.dataset.map); return; }
-    const route = t.closest("[data-route]"); if (route) { routeSel.value = route.dataset.route; drawRoute(); $("#carte").scrollIntoView({ behavior: "smooth" }); return; }
+    const route = t.closest("[data-route]"); if (route) { routeSel.value = route.dataset.route; drawRoute(); go("carte"); return; }
     const exp = t.closest("[data-expand]"); if (exp) { exp.closest("li").classList.remove("collapsed"); return; }
     const bk = t.closest("[data-book]"); if (bk) { openBooking(bk.dataset.book === "new" ? null : bk.dataset.book); return; }
-    const dx = t.closest("[data-del-exp]"); if (dx) { if (!confirm("Supprimer cette dépense ?")) return; try { await rpc("guide_delete_expense", { p_id: dx.dataset.delExp }); await refresh(); } catch (err) { toast(err.message); } return; }
+    const dx = t.closest("[data-del-exp]"); if (dx) { if (!confirm("Supprimer cette dépense ?")) return; try { await rpc("guide_delete_expense", { p_author: me.name, p_id: dx.dataset.delExp }); await refresh(); } catch (err) { toast(err.message); } return; }
     const neb = t.closest("[data-neb]"); if (neb) { showNeb(neb.dataset.neb); return; }
     if (t.closest("#histBtn")) { openHistory(); return; }
     if (t.closest(".print-btn")) { printCarnet(); return; }
@@ -351,7 +351,9 @@
     $("#editTitle").textContent = p ? "Modifier la proposition" : "Nouvelle proposition";
     ef.id.value = p ? p.id : ""; ef.day.value = p ? p.day : (day || DAY_KEYS[currentDay]);
     ef.time.value = p ? p.time_label : ""; ef.body.value = p ? p.body : ""; ef.tip.value = p ? (p.tip || "") : ""; ef.place.value = p ? (p.place_id || "") : "";
-    $("#delProp").hidden = !p; dlg.showModal();
+    $("#delProp").hidden = !p;
+    $("#editInfo").innerHTML = p ? `Créée par <b>${esc(p.author === "Guide" ? "Assistant" : p.author)}</b>${p.updated_by ? ` · modifiée par <b>${esc(p.updated_by === "Guide" ? "Assistant" : p.updated_by)}</b> ${ago(p.updated_at)}` : ""} · <button type="button" class="link" data-hist="${p.id}">voir l’historique</button>` : "Votre prénom sera enregistré dans le journal.";
+    dlg.showModal();
   }
   $("#cancelEdit").onclick = () => dlg.close();
   $("#delProp").onclick = async () => {
@@ -418,7 +420,7 @@
   function showOnMap(id) {
     const p = byId[id]; if (!p) return;
     if (!map.hasLayer(layers[p.cat])) { map.addLayer(layers[p.cat]); filters.querySelector(`[data-cat="${p.cat}"]`).classList.remove("off"); }
-    $("#carte").scrollIntoView({ behavior: "smooth" });
+    go("carte");
     setTimeout(() => { map.setView([p.lat, p.lng], 17); markers[id].openPopup(); }, 350);
   }
   $("#fitAll").onclick = () => map.fitBounds(allBounds, { padding: [20, 20] });
@@ -472,7 +474,7 @@
   function showNeb(id) {
     const a = NEB.find(x => x.id === id); if (!a) return;
     if (!map.hasLayer(nebLayer)) { map.addLayer(nebLayer); nebBtn.classList.remove("off"); }
-    $("#carte").scrollIntoView({ behavior: "smooth" });
+    go("carte");
     setTimeout(() => { map.setView([a.lat, a.lng], 17); nebLayer.eachLayer(l => { const g = l.getLatLng(); if (g.lat === a.lat && g.lng === a.lng) l.openPopup(); }); }, 350);
   }
   let nebFilter = store.get("sev-nebf", { q: "", free: false, hideFull: true });
@@ -542,7 +544,7 @@
           ${vs.s === "ko" ? `<div class="ko-line">${vs.label} — ${esc((it.body || "").replace(/^🗳\s*/, "").slice(0, 50))}… <button class="link" data-expand>afficher</button></div>` : ""}
           <div class="full">
           <div class="item-head"><div>${tag}${esc((it.body || "").replace(/^🗳\s*/, ""))}</div>
-            ${me ? `<button class="icon-btn" data-edit="${it.id}" title="Modifier">✏️</button>` : ""}</div>
+            ${me ? `<span class="item-btns"><button class="icon-btn" data-edit="${it.id}" title="Modifier">✏️</button>${it.updated_by ? `<button class="icon-btn" data-hist="${it.id}" title="Historique de cette étape">🕘</button>` : ""}</span>` : ""}</div>
           ${it.tip ? `<div class="advice">💡 ${esc(it.tip)}</div>` : ""}
           ${p ? `<button class="chip" style="background:${CATEGORIES[p.cat].color}" data-map="${p.id}">📍 ${esc(p.name)}</button> ${openBadge(p)}` : ""}
           ${me ? `<div class="by">proposé par ${esc(it.author)}${edited}</div><div class="social">${socialBlock(it.id)}</div>` : ""}
@@ -569,8 +571,8 @@
       const days = Math.ceil((start - now) / 864e5);
       const todo = me ? S("bookings").filter(b => b.status === "à réserver").length : 0;
       box.innerHTML = `<h2>⏳ Départ ${days <= 1 ? "demain soir" : `dans ${days} jours`}</h2>
-        <p>Premier rendez-vous : <strong>mercredi soir</strong>, taxi vers l’appartement puis tapas sur l’Alameda.</p>
-        ${todo ? `<p>🎟 <strong>${todo} réservation${todo > 1 ? "s" : ""}</strong> encore à faire → <a href="#resa">voir les fiches</a></p>` : ""}
+        <p>${trip().out && trip().out.dep ? `Premier rendez-vous : <strong>mercredi, vol ${esc(trip().out.num || "")} à ${hm(trip().out.dep)}</strong> depuis Toulouse — dîner avant de partir, arrivée à l’appartement vers ${fmtMin(flightPlan().home)}.` : `Premier rendez-vous : <strong>mercredi soir</strong>.`}</p>
+        ${todo ? `<p>🎟 <strong>${todo} réservation${todo > 1 ? "s" : ""}</strong> encore à faire → <a href="#resa" data-go="resa">voir les fiches</a></p>` : ""}
         <div class="w-row">${DAY_KEYS.map(k => `<div><div class="small muted">${esc(dayLabel(k))}</div>${weatherHtml(k) || "<span class='muted small'>météo à venir</span>"}</div>`).join("")}</div>`;
       return;
     }
@@ -608,7 +610,7 @@
       ${me && !remindOn ? `<button class="btn sm ghost" id="remindBtn">🔔 Rappels sur ce téléphone</button>` : ""}${remindOn ? `<span class="small muted">🔔 rappels actifs</span>` : ""}</div>
       <div id="improv" class="improv" hidden></div>`);
   }
-  document.addEventListener("click", e => { const b = e.target.closest("[data-pos]"); if (!b) return; const p = S("positions").find(x => same(x.author, b.dataset.pos)); if (p) { $("#carte").scrollIntoView({ behavior: "smooth" }); setTimeout(() => map.setView([p.lat, p.lng], 17), 350); } });
+  document.addEventListener("click", e => { const b = e.target.closest("[data-pos]"); if (!b) return; const p = S("positions").find(x => same(x.author, b.dataset.pos)); if (p) { go("carte"); setTimeout(() => map.setView([p.lat, p.lng], 17), 350); } });
 
   /* ================================================================
      Réservations
@@ -646,7 +648,7 @@
     $("#bookDel").hidden = !b; bd.showModal();
   }
   $("#bookCancel").onclick = () => bd.close();
-  $("#bookDel").onclick = async () => { if (!confirm("Supprimer cette fiche ?")) return; try { await rpc("guide_delete_booking", { p_id: bf.id.value }); bd.close(); await refresh(); } catch (err) { toast(err.message); } };
+  $("#bookDel").onclick = async () => { if (!confirm("Supprimer cette fiche ?")) return; try { await rpc("guide_delete_booking", { p_author: me.name, p_id: bf.id.value }); bd.close(); await refresh(); } catch (err) { toast(err.message); } };
   bf.addEventListener("submit", async e => {
     e.preventDefault();
     try {
@@ -793,8 +795,8 @@
       ...S("photos").map(p => ({ at: p.created_at, who: p.author, html: `a ajouté une photo 📷 (${esc(label(p.target))})` })),
       ...S("expenses").map(e => ({ at: e.created_at, who: e.created_by, html: `a saisi une dépense : ${esc(e.label)} (${euro(+e.amount)})` }))
     ].filter(x => x.who && x.who !== "Guide").sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 8);
-    box.hidden = false;
-    box.innerHTML = `<div class="feed-head"><h2>Quoi de neuf dans le groupe</h2><div><button class="btn sm ghost" id="histBtn">🕘 Historique</button> <button class="btn sm ghost print-btn">📖 Carnet</button></div></div>
+    box.hidden = typeof view !== "undefined" && view !== "accueil";
+    box.innerHTML = `<div class="feed-head"><h2>Quoi de neuf dans le groupe</h2><div><button class="btn sm ghost" data-go="journal">🕘 Journal complet</button> <button class="btn sm ghost print-btn">📖 Carnet</button></div></div>
       ${ev.length ? `<ul>${ev.map(x => `<li>${avatar(x.who, true)}<div><strong>${esc(x.who)}</strong> ${x.html} <span class="muted small">· ${ago(x.at)}</span></div></li>`).join("")}</ul>`
         : `<p class="muted">Rien encore. Votez sur les options 🗳 du programme 👇</p>`}`;
   }
@@ -1210,11 +1212,120 @@
   }
 
   /* ================================================================
+     v5 — Navigation par onglets + Journal « qui a fait quoi »
+     ================================================================ */
+  const VIEWS = ["accueil", "programme", "carte", "resa", "plus", "journal", "depenses", "album", "degust", "adresses", "pratique"];
+  const PARENT = { journal: "plus", depenses: "plus", album: "plus", degust: "plus", adresses: "plus", pratique: "plus" };
+  const TITLES = { journal: "Journal", depenses: "Dépenses", album: "Album", degust: "Dégustations", adresses: "Adresses", pratique: "Pratique" };
+  let view = "accueil";
+  function go(v, opts) {
+    if (!VIEWS.includes(v)) v = "accueil";
+    view = v;
+    document.querySelectorAll("[data-view]").forEach(el => { el.hidden = el.dataset.view !== v; });
+    $("#login").hidden = !!me;
+    $("#feed").hidden = v !== "accueil" || !me || !state;
+    document.querySelectorAll("#nav [data-go]").forEach(a => a.classList.toggle("on", a.dataset.go === (PARENT[v] || v)));
+    const back = $("#backBar");
+    back.hidden = !PARENT[v]; back.querySelector("b").textContent = TITLES[v] || "";
+    if (!opts || !opts.keepHash) history.replaceState(null, "", "#" + v);
+    if (v === "carte") setTimeout(() => map.invalidateSize(), 60);
+    if (v === "journal") loadJournal();
+    window.scrollTo({ top: 0 });
+  }
+  const backBar = document.createElement("div");
+  backBar.id = "backBar"; backBar.className = "back-bar"; backBar.hidden = true;
+  backBar.innerHTML = `<button class="link" data-go="plus">‹ Plus</button><b></b>`;
+  $("main").prepend(backBar);
+  document.addEventListener("click", e => {
+    const g = e.target.closest("[data-go]"); if (!g) return;
+    e.preventDefault(); go(g.dataset.go);
+  });
+  window.addEventListener("hashchange", () => { const v = location.hash.slice(1); if (VIEWS.includes(v) && v !== view) go(v, { keepHash: true }); });
+
+  /* ---------- Journal ---------- */
+  let journal = [], journalFilter = { who: "", kind: "", item: "" };
+  const who = n => (!n || n === "Guide") ? "Assistant" : n.replace(/\s*\(restauration\)$/, "");
+  const ENT = { proposals: "📅 Programme", bookings: "🎟 Réservations", trip: "✈️ Vols", expenses: "💶 Dépenses" };
+  const short = (s, n) => { s = String(s || "").replace(/^🗳\s*/, ""); return s.length > (n || 60) ? s.slice(0, n || 60) + "…" : s; };
+  function diffLines(a) {
+    const b = a.before || {}, n = a.after || {}, out = [];
+    if (a.action !== "modif") return out;
+    if (a.entity === "proposals") {
+      if (b.day !== n.day) out.push(`jour : ${dayName(b.day)} → <b>${dayName(n.day)}</b>`);
+      if (b.time_label !== n.time_label) out.push(`heure : ${esc(b.time_label || "—")} → <b>${esc(n.time_label || "—")}</b>`);
+      if (b.body !== n.body) out.push(`texte : <s>${esc(short(b.body, 80))}</s> → <b>${esc(short(n.body, 80))}</b>`);
+      if ((b.tip || "") !== (n.tip || "")) out.push(`conseil modifié`);
+      if ((b.place_id || "") !== (n.place_id || "")) out.push(`lieu : ${esc((byId[b.place_id] || {}).name || "—")} → <b>${esc((byId[n.place_id] || {}).name || "—")}</b>`);
+    } else if (a.entity === "bookings") {
+      [["status", "statut"], ["day", "jour"], ["time_label", "heure"], ["people", "personnes"], ["ref", "n° de confirmation"], ["title", "intitulé"]].forEach(([k, l]) => {
+        if (String(b[k] ?? "") !== String(n[k] ?? "")) out.push(`${l} : ${esc(k === "day" ? dayName(b[k]) : (b[k] ?? "—"))} → <b>${esc(k === "day" ? dayName(n[k]) : (n[k] ?? "—"))}</b>`);
+      });
+      if ((b.notes || "") !== (n.notes || "")) out.push("notes modifiées");
+    } else if (a.entity === "trip") {
+      const x = b.data || {}, y = n.data || {};
+      ["num", "dep", "arr", "ref"].forEach(k => { if ((x[k] || "") !== (y[k] || "")) out.push(`${{ num: "vol", dep: "départ", arr: "arrivée", ref: "réf." }[k]} : ${esc(k.length === 3 && x[k] && x[k].includes("T") ? hm(x[k]) : (x[k] || "—"))} → <b>${esc(k.length === 3 && y[k] && y[k].includes("T") ? hm(y[k]) : (y[k] || "—"))}</b>`); });
+    } else if (a.entity === "expenses") {
+      if (+b.amount !== +n.amount) out.push(`montant : ${euro(+b.amount)} → <b>${euro(+n.amount)}</b>`);
+      if (b.label !== n.label) out.push(`libellé : ${esc(b.label)} → <b>${esc(n.label)}</b>`);
+    }
+    return out;
+  }
+  function verb(a) {
+    const what = { proposals: "l’étape", bookings: "la réservation", trip: "le vol", expenses: "la dépense" }[a.entity] || "l’élément";
+    const v = { ajout: "a ajouté", modif: "a modifié", suppression: "a supprimé" }[a.action];
+    return a.undo_of ? `a annulé une action sur ${what}` : `${v} ${what}`;
+  }
+  async function loadJournal() {
+    const box = $("#journalBox");
+    if (!me) { box.innerHTML = `<p class="notice">Identifiez-vous pour voir le journal.</p>`; return; }
+    if (!journal.length) box.innerHTML = `<p class="muted">Chargement…</p>`;
+    try { journal = await rpc("guide_activity"); renderJournal(); } catch (err) { box.innerHTML = `<p class="muted">${esc(err.message)}</p>`; }
+  }
+  function renderJournal() {
+    const box = $("#journalBox"); if (!box) return;
+    const people = [...new Set(journal.map(a => who(a.who)))];
+    const f = journalFilter;
+    const list = journal.filter(a => (!f.who || who(a.who) === f.who) && (!f.kind || a.entity === f.kind) && (!f.item || a.entity_id === f.item));
+    let lastDay = "";
+    box.innerHTML = `<div class="jfilters">
+        <select id="jWho"><option value="">Tout le monde</option>${people.map(p => `<option ${p === f.who ? "selected" : ""}>${esc(p)}</option>`).join("")}</select>
+        <select id="jKind"><option value="">Tout</option>${Object.entries(ENT).map(([k, l]) => `<option value="${k}" ${k === f.kind ? "selected" : ""}>${l}</option>`).join("")}</select>
+        ${f.item ? `<button class="btn sm ghost" id="jAll">✕ Toutes les étapes</button>` : ""}</div>
+      ${list.length ? `<ul class="journal">${list.map(a => {
+        const d = new Date(a.at).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+        const head = d !== lastDay ? `<li class="jday">${d}</li>` : ""; lastDay = d;
+        const lines = diffLines(a);
+        const canUndo = !a.undone_by && !a.undo_of && !(state && state.read_only);
+        return `${head}<li class="jitem ${a.undone_by ? "undone" : ""}">${avatar(who(a.who), true)}
+          <div class="jbody"><div><strong>${esc(who(a.who))}</strong> ${verb(a)} <span class="muted">« ${esc(short(a.label))} »</span></div>
+          ${lines.length ? `<ul class="jdiff">${lines.map(l => `<li>${l}</li>`).join("")}</ul>` : ""}
+          <div class="small muted">${new Date(a.at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} · ${ENT[a.entity] || ""}${a.undone_by ? ` · <b>annulé par ${esc(who(a.undone_by))}</b>` : ""}</div></div>
+          ${canUndo ? `<button class="btn sm ghost" data-undo="${a.id}">↩︎ Annuler</button>` : ""}</li>`;
+      }).join("")}</ul>` : `<p class="muted">Aucune action pour ce filtre.</p>`}`;
+    $("#jWho").onchange = e => { journalFilter.who = e.target.value; renderJournal(); };
+    $("#jKind").onchange = e => { journalFilter.kind = e.target.value; renderJournal(); };
+    const all = $("#jAll"); if (all) all.onclick = () => { journalFilter.item = ""; renderJournal(); };
+  }
+  document.addEventListener("click", async e => {
+    const u = e.target.closest("[data-undo]");
+    if (u) {
+      const a = journal.find(x => x.id === +u.dataset.undo); if (!a) return;
+      const what = { ajout: "Supprimer ce qui a été ajouté", modif: "Revenir à la version précédente", suppression: "Remettre ce qui a été supprimé" }[a.action];
+      if (!confirm(`${what} ?\n« ${short(a.label, 80)} »`)) return;
+      try { await rpc("guide_undo", { p_author: me.name, p_id: a.id }); toast("Action annulée ↩︎"); await refresh(); await loadJournal(); } catch (err) { toast(err.message, 4000); }
+      return;
+    }
+    const h = e.target.closest("[data-hist]");
+    if (h) { journalFilter = { who: "", kind: "", item: h.dataset.hist }; if (dlg.open) dlg.close(); go("journal"); }
+  });
+
+  /* ================================================================
      Rendu global + démarrage
      ================================================================ */
   function renderAll() { renderNow(); renderDay(); renderBookings(); renderExpenses(); renderAlbum(); renderPlaces(); renderFeed(); renderV4(); loadThumbs(); }
   renderWho();
   renderAll();
+  go(VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "accueil", { keepHash: true });
   loadWeather();
   if (me) refresh();
 })();

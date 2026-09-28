@@ -313,3 +313,36 @@ input.mini{width:150px; padding:6px 8px; font-size:16px}
 #photoReacts{margin-top:6px}
 .route-svg{width:100%; max-width:600px; border:1px solid #ddd; border-radius:6px}
 @media (max-width:520px){ .flights .fl-row{grid-template-columns:1fr} }
+
+/* ===== v5 : navigation par onglets + journal ===== */
+html{scroll-padding-top:12px}
+body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
+[data-view][hidden]{display:none !important}
+.bottom-nav{position:fixed; left:0; right:0; bottom:0; z-index:2000; display:grid; grid-template-columns:repeat(5,1fr);
+  background:color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter:blur(12px); border-top:1px solid var(--line);
+  padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+.bottom-nav a{display:flex; flex-direction:column; align-items:center; gap:2px; text-decoration:none; color:var(--muted); font:600 .72rem Inter,sans-serif; padding:4px 0; border-radius:10px}
+.bottom-nav a span{font-size:1.35rem; line-height:1}
+.bottom-nav a.on{color:var(--almagra); background:color-mix(in srgb, var(--albero) 16%, transparent)}
+@media (min-width:900px){ .bottom-nav{left:50%; transform:translateX(-50%); width:560px; bottom:12px; border:1px solid var(--line); border-radius:18px; box-shadow:var(--shadow)} }
+.back-bar{display:flex; align-items:center; gap:10px; margin:0 0 6px; font-size:1rem}
+.back-bar .link{font-size:1rem; text-decoration:none}
+.plus-menu{display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:10px}
+.plus-menu a{display:grid; grid-template-columns:44px 1fr; grid-template-rows:auto auto; column-gap:10px; align-items:center; text-decoration:none; color:var(--ink);
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:14px; box-shadow:var(--shadow)}
+.plus-menu a span{grid-row:1/3; font-size:1.8rem; text-align:center}
+.plus-menu a b{font:700 1.05rem Fraunces,serif}
+.plus-menu a small{color:var(--muted)}
+.item-btns{display:flex; gap:4px; flex:none}
+.jfilters{display:flex; gap:8px; flex-wrap:wrap; margin:6px 0 10px}
+.jfilters select{width:auto; flex:1 1 160px}
+.journal{list-style:none; padding:0; margin:0}
+.journal .jday{font:700 .95rem Fraunces,serif; text-transform:capitalize; margin:16px 0 4px; color:var(--almagra)}
+.jitem{display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-top:1px dashed var(--line)}
+.jitem .jbody{flex:1; min-width:0; font-size:.93rem}
+.jitem.undone{opacity:.55}
+.jdiff{margin:4px 0; padding-left:1.1em; font-size:.86rem}
+.jdiff s{color:var(--muted)}
+#editInfo{margin:-6px 0 0}
+
+.back-bar[hidden]{display:none !important}
