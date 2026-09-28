@@ -884,12 +884,13 @@
   }
   function flightItems(key) {
     const t = trip(), p = flightPlan(), out = [];
-    if (key === "mer" && t.out) {
+    const inProg = num => num && S("proposals").some(p => (p.body || "").includes(num));
+    if (key === "mer" && t.out && !inProg(t.out.num)) {
       out.push({ id: "fl-out", flight: true, time_label: hm(t.out.dep), body: `✈️ Décollage ${t.out.num || ""} de Toulouse`, tip: t.out.num ? `Suivi en direct : bouton « Suivre le vol ».` : "" });
       if (t.out.arr) out.push({ id: "fl-arr", flight: true, time_label: hm(t.out.arr), body: `🛬 Atterrissage à Séville — à l’appartement vers ${fmtMin(p.home)}`, tip: "Taxi officiel à la sortie, tarif forfaitaire affiché." });
     }
     if (key === "sam" && t.ret && t.ret.dep) {
-      out.push({ id: "fl-leave", flight: true, time_label: fmtMin(p.leave), body: `🧳 Départ de l’appartement pour l’aéroport (vol ${t.ret.num || ""} à ${hm(t.ret.dep)})`, tip: `Terminer la dernière étape vers ${fmtMin(p.lastStop)}. Réserver un taxi 30 min avant.` });
+      if (!inProg(t.ret.num)) out.push({ id: "fl-leave", flight: true, time_label: fmtMin(p.leave), body: `🧳 Départ de l’appartement pour l’aéroport (vol ${t.ret.num || ""} à ${hm(t.ret.dep)})`, tip: `Terminer la dernière étape vers ${fmtMin(p.lastStop)}. Réserver un taxi 30 min avant.` });
       out.push({ id: "fl-ret", flight: true, time_label: hm(t.ret.dep), body: `✈️ Décollage ${t.ret.num || ""} vers Toulouse`, tip: "" });
     }
     return out;
@@ -918,7 +919,9 @@
       { type: "row", items: [{ name: "r_num", label: "Retour : n° de vol", value: r.num, ph: "V7 1235" }, { name: "r_ref", label: "Réf. réservation", value: r.ref }] },
       { type: "row", items: [{ name: "r_dep", label: "Décollage (sam. 3)", type: "time", value: tm(r.dep) }, { name: "r_arr", label: "Atterrissage", type: "time", value: tm(r.arr) }] }
     ], async d => {
-      const mk = (date, dep, arr, num, ref) => ({ date, num: num.trim().toUpperCase(), ref: ref.trim(), dep: dep ? `${date}T${dep}` : null, arr: arr ? `${date}T${arr}` : null });
+      const next = date => { const d = new Date(date + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); };
+      const mk = (date, dep, arr, num, ref) => ({ date, num: num.trim().toUpperCase(), ref: ref.trim(), dep: dep ? `${date}T${dep}` : null,
+        arr: arr ? `${dep && arr < dep ? next(date) : date}T${arr}` : null });
       await rpc("guide_save_trip", { p_author: me.name, p_key: "out", p_data: mk("2026-09-30", d.o_dep, d.o_arr, d.o_num, d.o_ref) });
       await rpc("guide_save_trip", { p_author: me.name, p_key: "ret", p_data: mk("2026-10-03", d.r_dep, d.r_arr, d.r_num, d.r_ref) });
       await refresh(); toast("Vols enregistrés ✈️");
