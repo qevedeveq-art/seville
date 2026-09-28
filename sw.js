@@ -2,7 +2,7 @@
    - fichiers de l'appli : réseau d'abord, cache en secours (toujours à jour quand il y a du réseau)
    - librairies, polices, tuiles de carte : cache d'abord (les zones déjà vues restent disponibles)
    - données du groupe (Supabase) : jamais mises en cache ici (gérées par l'appli via localStorage) */
-const VERSION = "sev-v8";
+const VERSION = "sev-v9";
 const APP = ["./", "index.html", "style.css", "app.js", "data.js", "neb.json", "manifest.webmanifest", "icons/icon-192.png",
   "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css",
   "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"];

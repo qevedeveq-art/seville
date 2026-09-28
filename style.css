@@ -358,3 +358,40 @@ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
 .isteps li{margin:.4em 0}
 .ico{display:inline-block; border:1px solid var(--line,#ccc); border-radius:6px; padding:0 6px; color:#0a84ff}
 @media print{.install-bar{display:none !important}}
+
+/* v7 — thème manuel */
+:root[data-theme="dark"]{ --bg:#16120f; --surface:#221c17; --ink:#f3ece2; --muted:#b3a697; --line:#3a3029; --shadow:0 1px 2px rgba(0,0,0,.4); color-scheme:dark }
+:root[data-theme="light"]{ color-scheme:light }
+:root[data-theme="dark"] .leaflet-tile{filter:brightness(.72) invert(1) contrast(.9) hue-rotate(180deg)}
+@media (prefers-color-scheme: dark){ :root:not([data-theme]) .leaflet-tile{filter:brightness(.72) invert(1) contrast(.9) hue-rotate(180deg)} }
+html.eco *, html.eco *::before, html.eco *::after{animation:none !important; transition:none !important; scroll-behavior:auto !important}
+html.eco .hero{background:#1b1512 !important}
+.settings{margin-top:14px}
+.settings h3{margin-bottom:10px}
+.seg{display:inline-flex; border:1px solid var(--line); border-radius:999px; overflow:hidden; margin-bottom:12px; flex-wrap:wrap}
+.seg button{border:0; background:transparent; color:var(--ink); padding:8px 14px; font:inherit; cursor:pointer}
+.seg button.on{background:var(--almagra); color:#fff}
+.seg button:disabled{opacity:.5}
+.switch{display:flex; gap:10px; align-items:flex-start; cursor:pointer}
+.switch input{width:22px; height:22px; margin-top:2px; accent-color:var(--almagra)}
+.switch small{display:block; color:var(--muted)}
+/* sondages */
+.add-row{display:flex; flex-wrap:wrap; gap:8px}
+.timeline li.poll .x{border:2px dashed var(--albero); border-radius:12px; padding:10px 12px}
+.poll-head{margin-bottom:8px}
+.poll-opts{display:grid; gap:8px}
+.poll-opt{display:flex; gap:10px; justify-content:space-between; align-items:center; background:var(--bg); border:1px solid var(--line); border-radius:10px; padding:8px 10px}
+.poll-opt.mine{border-color:var(--almagra); box-shadow:0 0 0 1px var(--almagra) inset}
+.po-votes{display:flex; gap:4px; align-items:center; margin-top:4px}
+.po-act{display:flex; flex-direction:column; gap:4px; align-items:flex-end}
+/* jour J */
+.jj-prog{margin:4px 0 10px}
+.jj-bar{height:6px; background:var(--line); border-radius:6px; overflow:hidden; margin-top:4px}
+.jj-bar span{display:block; height:100%; background:var(--albero)}
+.leave{margin:6px 0; font-size:.95rem}
+.leave .hot{color:var(--almagra)}
+.now-map{height:150px; border-radius:12px; margin:10px 0; overflow:hidden; cursor:pointer; border:1px solid var(--line); z-index:0}
+.demo-flag{background:#fff3cd; color:#5b4200; border-radius:8px; padding:6px 10px; font-size:.85rem; margin-bottom:8px}
+/* récap */
+.recap textarea{width:100%; font:14px/1.45 Inter,system-ui,sans-serif; border:1px solid var(--line); border-radius:10px; padding:10px; background:var(--bg); color:var(--ink)}
+.recap .seg{margin:6px 0 10px}

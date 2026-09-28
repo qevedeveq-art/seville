@@ -17,6 +17,7 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="P&amp;D Séville">
+  <script>try{var t=JSON.parse(localStorage.getItem("sev-theme")||'"auto"'),e=JSON.parse(localStorage.getItem("sev-eco")||"false");if(e){document.documentElement.classList.add("eco");t="dark";}if(t!=="auto")document.documentElement.setAttribute("data-theme",t);}catch(x){}</script>
   <script>window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();window.__bip=e;document.dispatchEvent(new Event("bip"));});</script>
 </head>
 <body>
@@ -85,12 +86,18 @@
       <h2 class="section-title">Plus</h2>
       <div class="plus-menu">
         <a href="#" data-install class="install-item" hidden><span>📲</span><b>Installer l’appli</b><small>Sur l’écran d’accueil Android ou iPhone</small></a>
+        <a href="#" data-recap><span>🌙</span><b>Récap du jour</b><small>Résumé de la journée à envoyer sur WhatsApp</small></a>
         <a href="#journal" data-go="journal"><span>🕘</span><b>Journal</b><small>Qui a fait quoi, annuler une action</small></a>
         <a href="#depenses" data-go="depenses"><span>💶</span><b>Dépenses</b><small>Qui a payé, qui doit combien</small></a>
         <a href="#album" data-go="album"><span>📸</span><b>Album</b><small>Photos du groupe, téléchargement</small></a>
         <a href="#degust" data-go="degust"><span>⭐</span><b>Dégustations</b><small>Noter tapas et vins, classement</small></a>
         <a href="#adresses" data-go="adresses"><span>🍷</span><b>Adresses</b><small>Bars, tables, flamenco, marchés</small></a>
         <a href="#pratique" data-go="pratique"><span>ℹ️</span><b>Pratique</b><small>Phrases utiles, conseils, billets</small></a>
+      </div>
+      <div class="card settings">
+        <h3>Affichage</h3>
+        <div class="seg" role="group" aria-label="Thème"><button type="button" data-theme-set="auto">Auto</button><button type="button" data-theme-set="light">☀️ Clair</button><button type="button" data-theme-set="dark">🌙 Sombre</button></div>
+        <label class="switch"><input type="checkbox" id="ecoToggle"><span><b>🔋 Économie de batterie</b><small>Écran sombre, synchronisation toutes les ~2 min, pas de localisation automatique ni de mini-carte. Idéal pour la Noche en Blanco.</small></span></label>
       </div>
     </section>
 

@@ -22,10 +22,13 @@
   const same = (a, b) => String(a || "").toLowerCase() === String(b || "").toLowerCase();
   const euro = n => (Math.round(n * 100) / 100).toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 
-  /* ---------- Heure de Séville ---------- */
+  /* ---------- Heure de Séville (?demo=2026-10-01T13:00 pour simuler) ---------- */
+  var DEMO = (() => { const m = location.search.match(/[?&]demo=(\d{4}-\d\d-\d\dT\d\d:\d\d)/); return m ? new Date(m[1] + ":00+02:00") : null; })();
+  var demoT0 = Date.now();
+  function nowDate() { return DEMO ? new Date(DEMO.getTime() + Date.now() - demoT0) : new Date(); }
   function madridNow() {
     const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false, weekday: "short" })
-      .formatToParts(new Date()).map(x => [x.type, x.value]));
+      .formatToParts(nowDate()).map(x => [x.type, x.value]));
     const wd = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[p.weekday];
     return { date: `${p.year}-${p.month}-${p.day}`, min: (+p.hour % 24) * 60 + +p.minute, wd };
   }
@@ -107,7 +110,8 @@
       $("#syncInfo").textContent = "Hors ligne — dernière version enregistrée";
     }
   }
-  setInterval(() => { if (me && document.visibilityState === "visible") refresh(true); }, 20000);
+  let syncTick = 0;
+  setInterval(() => { syncTick++; if (me && document.visibilityState === "visible" && (!ecoOn() || syncTick % 5 === 0)) refresh(true); }, 20000);
   setInterval(() => renderNow(), 60000);
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") refresh(true); });
 
@@ -143,6 +147,11 @@
 
   /* ---------- Votes → statut ---------- */
   function voteStatus(id) {
+    const pg = pollById(id);
+    if (pg) {
+      if (!pg.decided) return { s: "", label: "", up: 0, down: 0, poll: true };
+      return pg.winner === id ? { s: "ok", label: `✅ Choisi (${pg.votes[id].length} 🗳)`, up: 0, down: 0 } : { s: "ko", label: "❌ Non retenu", up: 0, down: 0 };
+    }
     const rs = reactionsFor(id);
     const up = rs.filter(r => r.emoji === "👍").length, down = rs.filter(r => r.emoji === "👎").length;
     if (up >= 3 && up > down) return { s: "ok", label: `✅ Validé (${up} 👍)`, up, down };
@@ -445,7 +454,7 @@
     routeLayer.clearLayers(); routeInfo.textContent = "";
     const key = routeSel.value; if (!key) return;
     const pts = [];
-    itemsForDay(key).filter(it => it.place_id && byId[it.place_id] && voteStatus(it.id).s !== "ko").forEach(it => {
+    collapsePolls(itemsForDay(key)).filter(it => it.place_id && byId[it.place_id] && voteStatus(it.id).s !== "ko").forEach(it => {
       const p = byId[it.place_id]; if (!pts.length || pts[pts.length - 1].p.id !== p.id) pts.push({ p, it });
     });
     if (!pts.length) { routeInfo.textContent = "Aucun lieu placé ce jour-là."; return; }
@@ -528,11 +537,14 @@
     if (!seenDays.has(d.key)) { seenDays.add(d.key); openThreads.add("day:" + d.key); }
     [...tabs.children].forEach((b, j) => b.setAttribute("aria-selected", j === currentDay));
     const plan = flightPlan();
+    const shownPolls = new Set();
     const items = [...itemsForDay(d.key), ...flightItems(d.key)].sort((x, y) => timeKey(x.time_label) - timeKey(y.time_label)), tips = DAY_TIPS[d.key];
     panel.innerHTML = `<div class="day-head"><div><h3>${esc(d.title)}</h3><p class="mood">${esc(d.mood)}</p></div>${weatherHtml(d.key, true)}</div>
       ${me ? "" : `<p class="notice">👋 Identifiez-vous en haut de page pour modifier le programme, voter, commenter et partager des photos.</p>`}
       <div class="day-actions"><button class="btn sm ghost" data-route="${d.key}">🗺 Itinéraire du jour</button></div>
       <ol class="timeline">${items.map(it => {
+        const pg = pollById(it.id);
+        if (pg && !pg.decided) { if (shownPolls.has(pg.key)) return ""; shownPolls.add(pg.key); return pollLi(pg); }
         const p = it.place_id && byId[it.place_id];
         const vs = me ? voteStatus(it.id) : { s: "" };
         const vote = /^🗳/.test(it.body || "");
@@ -550,7 +562,7 @@
           ${me ? `<div class="by">proposé par ${esc(it.author)}${edited}</div><div class="social">${socialBlock(it.id)}</div>` : ""}
           </div></div></li>`;
       }).join("") || `<li><div class="t"></div><div class="x muted">Rien de prévu pour l’instant.</div></li>`}</ol>
-      ${me ? `<button class="btn add" data-add="${d.key}">＋ Proposer une activité</button>` : ""}
+      ${me ? `<div class="add-row"><button class="btn add" data-add="${d.key}">＋ Proposer une activité</button><button class="btn add ghost" data-poll="${d.key}">🗳 Faire voter entre 2–3 options</button></div>` : ""}
       ${d.key === "ven" ? nebBlock() : ""}
       <div class="day-extra">
         <div class="card soft"><h4>🧭 Conseils du jour</h4><ul>${tips.conseils.map(c => `<li>${esc(c)}</li>`).join("")}</ul></div>
@@ -565,8 +577,12 @@
      Maintenant / ensuite
      ================================================================ */
   function renderNowBase() {
-    const box = $("#now"), n = madridNow(), key = DATE_DAY[n.date];
-    const start = new Date("2026-09-30T18:00:00+02:00"), end = new Date("2026-10-04T02:00:00+02:00"), now = new Date();
+    const box = $("#now"), n = madridNow();
+    const prevDate = new Date(Date.parse(n.date + "T12:00:00Z") - 864e5).toISOString().slice(0, 10);
+    const late = n.min < 360 && DATE_DAY[prevDate];
+    const key = late ? DATE_DAY[prevDate] : DATE_DAY[n.date], nm = late ? n.min + 1440 : n.min;
+    jjNow = null;
+    const start = new Date("2026-09-30T18:00:00+02:00"), end = new Date("2026-10-04T02:00:00+02:00"), now = nowDate();
     if (!key && now < start) {
       const days = Math.ceil((start - now) / 864e5);
       const todo = me ? S("bookings").filter(b => b.status === "à réserver").length : 0;
@@ -580,20 +596,22 @@
       box.innerHTML = `<h2>🧡 ¡Hasta la próxima, Sevilla!</h2><p>Tout le séjour (votes, commentaires, photos, dépenses) est rassemblé dans le carnet.</p><button class="btn print-btn">📖 Générer le carnet de voyage (PDF)</button>`;
       return;
     }
-    const k = key || "mer", items = itemsForDay(k).filter(it => voteStatus(it.id).s !== "ko");
+    const k = key || "mer", items = collapsePolls(itemsForDay(k)).filter(it => voteStatus(it.id).s !== "ko");
     let cur = null, next = null;
-    for (const it of items) { const t = timeKey(it.time_label); if (t <= n.min + 10) cur = it; else if (!next) next = it; }
+    for (const it of items) { const t = timeKey(it.time_label); if (t <= nm + 10) cur = it; else if (!next) next = it; }
+    jjNow = { k, nm, items, cur, next };
     const card = (it, lbl) => {
       if (!it) return "";
       const p = it.place_id && byId[it.place_id];
       const dist = p && myPos ? distKm(myPos, [p.lat, p.lng]) : null;
       return `<div class="now-card"><div class="small muted">${lbl} · ${esc(it.time_label)}</div><div class="now-body">${esc((it.body || "").replace(/^🗳\s*/, ""))}</div>
+        ${lbl === "Ensuite" ? leaveHint(it, dist) : ""}
         ${it.tip ? `<div class="advice">💡 ${esc(it.tip)}</div>` : ""}
         ${p ? `<div class="now-links"><a class="btn sm" href="${walkTo(p)}" target="_blank" rel="noopener">🚶 Y aller${dist != null ? ` · ${walkMin(dist)} min` : ""}</a>
           <button class="btn sm ghost" data-map="${p.id}">Carte</button> ${openBadge(p)}</div>` : ""}</div>`;
     };
     box.innerHTML = `<div class="now-head"><h2>📍 ${esc(dayName(k))}</h2>${weatherHtml(k)}</div>
-      ${card(cur, "En ce moment")}${card(next, "Ensuite")}
+      ${jjProgress()}${card(cur, "En ce moment")}${card(next, "Ensuite")}${jjMap()}
       ${!cur && !next ? `<p class="muted">Rien de prévu : improvisez ! (Adresses → « ouvert maintenant »)</p>` : ""}
       <div class="now-links"><button class="btn sm ghost" id="nowLocate">📍 ${myPos ? "Actualiser ma position" : "Calculer les temps de marche"}</button>
       <button class="btn sm ghost" data-route="${k}">🗺 Itinéraire du jour</button></div>`;
@@ -609,6 +627,7 @@
       <div class="now-links"><button class="btn sm" id="improvBtn">🎲 On improvise</button>
       ${me && !remindOn ? `<button class="btn sm ghost" id="remindBtn">🔔 Rappels sur ce téléphone</button>` : ""}${remindOn ? `<span class="small muted">🔔 rappels actifs</span>` : ""}</div>
       <div id="improv" class="improv" hidden></div>`);
+    nowExtras();
   }
   document.addEventListener("click", e => { const b = e.target.closest("[data-pos]"); if (!b) return; const p = S("positions").find(x => same(x.author, b.dataset.pos)); if (p) { go("carte"); setTimeout(() => map.setView([p.lat, p.lng], 17), 350); } });
 
@@ -1361,6 +1380,205 @@
   document.addEventListener("bip", renderInstall);
   window.addEventListener("appinstalled", () => { window.__bip = null; renderInstall(); toast("Appli installée 🎉"); });
 
+
+  /* ================================================================
+     v7 — Jour J, sondages, récap du soir, thème & économie de batterie
+     ================================================================ */
+  /* ---------- Sondages : plusieurs options 🗳 au même créneau ---------- */
+  var pgState = null, pgCache = null;
+  function polls() {
+    if (pgCache && pgState === state) return pgCache;
+    const groups = {};
+    S("proposals").filter(p => /^🗳/.test(p.body || "") && timeKey(p.time_label) < 2000).forEach(p => {
+      const key = p.day + "|" + timeKey(p.time_label); (groups[key] = groups[key] || []).push(p);
+    });
+    const byOpt = {};
+    Object.entries(groups).filter(([, os]) => os.length >= 2).forEach(([key, os]) => {
+      os.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      const votes = {}; os.forEach(o => { votes[o.id] = reactionsFor(o.id).filter(r => r.emoji === "🗳").map(r => r.author); });
+      const voters = new Set(os.flatMap(o => votes[o.id].map(a => a.toLowerCase())));
+      const max = Math.max(...os.map(o => votes[o.id].length)), leaders = os.filter(o => votes[o.id].length === max);
+      const decided = max >= 3 || (voters.size >= 4 && leaders.length === 1 && max > 0);
+      const g = { key, day: os[0].day, time_label: os[0].time_label, opts: os, votes, voters: voters.size, decided, winner: decided ? leaders[0].id : null, tie: voters.size >= 4 && leaders.length > 1 };
+      os.forEach(o => { byOpt[o.id] = g; });
+    });
+    pgState = state; pgCache = byOpt; return byOpt;
+  }
+  function pollById(id) { return state ? polls()[id] || null : null; }
+  function collapsePolls(list) {
+    const out = [], seen = new Set();
+    list.forEach(it => {
+      const pg = pollById(it.id);
+      if (!pg || pg.decided) return out.push(it);
+      if (seen.has(pg.key)) return; seen.add(pg.key);
+      out.push({ id: "poll:" + pg.key, time_label: pg.time_label, body: "🗳 À choisir : " + pg.opts.map(o => short(o.body, 38)).join(" ou "), tip: "Votez dans le Programme 📅", place_id: null, pseudo: true });
+    });
+    return out;
+  }
+  function pollLi(pg) {
+    const mine = me && pg.opts.find(o => pg.votes[o.id].some(a => same(a, me.name)));
+    return `<li class="poll"><div class="t">${esc(pg.time_label)}</div><div class="x">
+      <div class="poll-head">🗳 <b>On choisit !</b> <span class="muted small">1 vote chacun · retenu dès 3 voix${pg.tie ? " · <b>égalité</b>, quelqu’un doit changer d’avis 😉" : ""}</span></div>
+      <div class="poll-opts">${pg.opts.map(o => {
+        const p = o.place_id && byId[o.place_id], v = pg.votes[o.id], isMine = mine && mine.id === o.id;
+        return `<div class="poll-opt ${isMine ? "mine" : ""}"><div class="po-body"><div>${esc((o.body || "").replace(/^🗳\s*/, ""))}</div>
+          ${p ? `<button class="chip" style="background:${CATEGORIES[p.cat].color}" data-map="${p.id}">📍 ${esc(p.name)}</button> ${openBadge(p)}` : ""}
+          <div class="po-votes">${v.map(a => avatar(a, true)).join("")}<span class="small muted">${v.length} vote${v.length > 1 ? "s" : ""}</span></div></div>
+          ${me ? `<div class="po-act"><button class="btn sm ${isMine ? "" : "ghost"}" data-pollvote="${o.id}">${isMine ? "✓ Mon choix" : "Voter"}</button><button class="icon-btn" data-edit="${o.id}" title="Modifier">✏️</button></div>` : ""}</div>`;
+      }).join("")}</div>
+      <div class="by">proposé par ${esc(pg.opts[0].author)}</div></div></li>`;
+  }
+  document.addEventListener("click", async e => {
+    const b = e.target.closest("[data-pollvote]"); if (!b || !me) return;
+    const id = b.dataset.pollvote, pg = pollById(id); if (!pg) return;
+    b.disabled = true;
+    try {
+      for (const o of pg.opts) {
+        const has = pg.votes[o.id].some(a => same(a, me.name));
+        if (o.id === id || has) await rpc("guide_toggle_reaction", { p_author: me.name, p_target: o.id, p_emoji: "🗳" });
+      }
+      await refresh();
+      const ng = pollById(id); if (ng && ng.decided) toast("🎉 Option retenue : " + short(ng.opts.find(o => o.id === ng.winner).body, 50), 4000);
+    } catch (err) { toast(err.message); b.disabled = false; }
+  });
+  document.addEventListener("click", e => {
+    const b = e.target.closest("[data-poll]"); if (!b || !me) return;
+    const day = b.dataset.poll;
+    const opts = [["", "— lieu (facultatif) —"], ...PLACES.slice().sort((a, b) => a.name.localeCompare(b.name)).map(p => [p.id, p.name])];
+    formDialog(`🗳 Faire voter — ${dayName(day)}`, [
+      { name: "time", label: "Créneau", required: true, ph: "ex. 21h00", max: 30 },
+      { type: "row", items: [{ name: "t1", label: "Option 1", required: true, ph: "ex. Tapas à Triana" }, { type: "select", name: "p1", label: "Lieu", options: opts }] },
+      { type: "row", items: [{ name: "t2", label: "Option 2", required: true, ph: "ex. Dîner à El Arenal" }, { type: "select", name: "p2", label: "Lieu", options: opts }] },
+      { type: "row", items: [{ name: "t3", label: "Option 3 (facultatif)" }, { type: "select", name: "p3", label: "Lieu", options: opts }] }
+    ], async d => {
+      if (!/\d/.test(d.time)) throw new Error("Indiquez une heure (ex. 21h00).");
+      const list = [1, 2, 3].map(i => ({ t: (d["t" + i] || "").trim(), p: d["p" + i] || "" })).filter(x => x.t);
+      if (list.length < 2) throw new Error("Il faut au moins 2 options.");
+      for (const x of list) await rpc("guide_save_proposal", { p_author: me.name, p_id: null, p_day: day, p_time: d.time.trim(), p_body: "🗳 " + x.t, p_tip: "", p_place: x.p });
+      await refresh(); toast("Sondage créé 🗳 — chacun vote dans le programme");
+    });
+  });
+
+  /* ---------- Jour J ---------- */
+  var jjNow = null, miniMap = null;
+  function leaveHint(it, dist) {
+    if (!jjNow || !/\d/.test(it.time_label || "")) return "";
+    const t = timeKey(it.time_label), delta = t - jjNow.nm; if (delta < 0 || delta > 600) return "";
+    const w = dist != null ? walkMin(dist) : null, dep = w != null ? t - w - 5 : null;
+    const inTxt = delta >= 60 ? `${Math.floor(delta / 60)} h ${String(delta % 60).padStart(2, "0")}` : `${delta} min`;
+    return `<div class="leave">⏱ dans <b>${inTxt}</b>${dep != null ? (dep <= jjNow.nm ? ` · <b class="hot">🚶 partez maintenant</b> (${w} min à pied)` : ` · partez à <b>${fmtMin(dep)}</b> (${w} min à pied)`) : ` · <button class="link" data-locate>📍 temps de marche</button>`}</div>`;
+  }
+  function jjProgress() {
+    if (!jjNow || !jjNow.items.length) return "";
+    const done = jjNow.items.filter(it => timeKey(it.time_label) <= jjNow.nm + 10).length, n = jjNow.items.length;
+    return `<div class="jj-prog"><span class="small muted">Étape ${Math.max(done, 1)}/${n} de la journée</span><div class="jj-bar"><span style="width:${Math.round(done / n * 100)}%"></span></div></div>`;
+  }
+  function jjMap() {
+    const it = jjNow && jjNow.next, p = it && it.place_id && byId[it.place_id];
+    if (!p || ecoOn()) return "";
+    return `<div id="nowMap" class="now-map" data-map="${p.id}" title="Ouvrir sur la carte" data-lat="${p.lat}" data-lng="${p.lng}"></div>`;
+  }
+  function nowExtras() {
+    if (miniMap) { try { miniMap.remove(); } catch (e) {} miniMap = null; }
+    const el = $("#nowMap");
+    if (el && window.L) {
+      const dest = [+el.dataset.lat, +el.dataset.lng];
+      miniMap = L.map(el, { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, touchZoom: false, tap: false });
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(miniMap);
+      L.circleMarker(dest, { radius: 9, color: "#fff", weight: 2, fillColor: "#b5452b", fillOpacity: 1 }).addTo(miniMap);
+      if (myPos && distKm(myPos, dest) < 8) {
+        L.circleMarker(myPos, { radius: 7, color: "#fff", weight: 2, fillColor: "#1f5f8b", fillOpacity: 1 }).addTo(miniMap);
+        L.polyline([myPos, dest], { color: "#1f5f8b", weight: 3, dashArray: "6 6" }).addTo(miniMap);
+        miniMap.fitBounds(L.latLngBounds([myPos, dest]), { padding: [24, 24], maxZoom: 17 });
+      } else miniMap.setView(dest, 16);
+    }
+    // Boutons contextuels : récap du soir, économie de batterie
+    const box = $("#now"), n = madridNow();
+    if (jjNow && me) {
+      const extra = [];
+      if (jjNow.nm >= 18 * 60) extra.push(`<button class="btn sm ghost" data-recap="${jjNow.k}">🌙 Récap du jour à partager</button>`);
+      if (jjNow.k === "ven" && jjNow.nm >= 19 * 60 && !ecoOn()) extra.push(`<button class="btn sm ghost" data-eco-on>🔋 Économie de batterie pour la nuit</button>`);
+      if (extra.length) box.insertAdjacentHTML("beforeend", `<div class="now-links">${extra.join("")}</div>`);
+    }
+    if (DEMO) box.insertAdjacentHTML("afterbegin", `<div class="demo-flag">🧪 Heure simulée : ${esc(dayName(DATE_DAY[n.date] || "") || n.date)} ${fmtMin(n.min)} — <a href="./">revenir à l’heure réelle</a></div>`);
+  }
+  document.addEventListener("click", async e => {
+    const b = e.target.closest("[data-locate]"); if (!b) return;
+    try { await locateMe(); renderNow(); } catch (err) { toast(err.message); }
+  });
+  function tripActive() { const t = nowDate(); return t >= new Date("2026-09-30T18:00:00+02:00") && t <= new Date("2026-10-04T02:00:00+02:00"); }
+  async function autoLocate() {
+    if (!tripActive() || ecoOn() || !navigator.permissions) return;
+    try { const st = await navigator.permissions.query({ name: "geolocation" }); if (st.state === "granted") { await locateMe(); renderNow(); } } catch (e) {}
+  }
+  setInterval(() => { if (document.visibilityState === "visible") autoLocate(); }, 120000);
+
+  /* ---------- Récap du soir ---------- */
+  const mdDate = iso => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
+  function recapText(k) {
+    const date = DAY_DATE[k], L1 = [];
+    const items = collapsePolls(itemsForDay(k)).filter(it => !it.pseudo && voteStatus(it.id).s !== "ko" && (!/^🗳/.test(it.body || "") || voteStatus(it.id).s === "ok"));
+    L1.push(`🌙 Séville · ${dayName(k)}`);
+    if (items.length) {
+      L1.push("", "📍 La journée :");
+      items.slice(0, 9).forEach(it => { const p = it.place_id && byId[it.place_id]; L1.push(`• ${it.time_label} — ${short(it.body, 55)}${p && !short(it.body, 55).includes(p.name) ? ` (${p.name})` : ""}`); });
+    }
+    const love = t => reactionsFor(t).filter(r => ["❤️", "👍", "😋"].includes(r.emoji)).length;
+    const best = items.map(it => ({ it, n: love(it.id) })).sort((a, b) => b.n - a.n)[0];
+    if (best && best.n) L1.push("", `❤️ Moment préféré : ${short(best.it.body, 60)} (${best.n} réaction${best.n > 1 ? "s" : ""})`);
+    const ts = S("tastings").filter(t => t.created_at && mdDate(t.created_at) === date).sort((a, b) => b.rating - a.rating).slice(0, 3);
+    if (ts.length) { L1.push("", "⭐ Top dégustations :"); ts.forEach(t => L1.push(`• ${t.item}${placeName(t) ? " @ " + placeName(t) : ""} ${"★".repeat(t.rating)} (${t.author})`)); }
+    const ex = S("expenses").filter(x => x.day === k), tot = ex.reduce((s, x) => s + +x.amount, 0);
+    if (tot) L1.push("", `💶 Dépenses du jour : ${euro(tot)} (≈ ${euro(tot / Math.max(members().length, 4))} par personne)`);
+    const ph = S("photos").filter(p => (p.created_at && mdDate(p.created_at) === date) || targetDay(p.target) === k).length;
+    if (ph) L1.push(`📸 ${ph} photo${ph > 1 ? "s" : ""} dans l’album`);
+    const nextK = DAY_KEYS[DAY_KEYS.indexOf(k) + 1];
+    if (nextK) { const first = collapsePolls(itemsForDay(nextK)).filter(it => voteStatus(it.id).s !== "ko")[0]; if (first) L1.push("", `👉 Demain : ${first.time_label} — ${short(first.body, 55)}`); }
+    L1.push("", "¡Olé! 💃");
+    return L1.join("\n");
+  }
+  function openRecap(k) {
+    if (!me) return toast("Identifiez-vous d’abord.");
+    const n = madridNow(); k = k || DATE_DAY[n.date] || (n.date > "2026-10-03" ? "sam" : "mer");
+    const d = document.createElement("dialog");
+    d.innerHTML = `<div class="dlg-pad recap"><h3>🌙 Récap du jour</h3>
+      <div class="seg">${DAY_KEYS.map(x => `<button type="button" data-rk="${x}" class="${x === k ? "on" : ""}">${esc(dayName(x).split(" ")[0])}</button>`).join("")}</div>
+      <textarea rows="14"></textarea><p class="muted small">Vous pouvez retoucher le texte avant de l’envoyer.</p>
+      <div class="dlg-actions"><button class="btn" data-wa>💬 WhatsApp</button>${navigator.share ? `<button class="btn ghost" data-share>Partager…</button>` : ""}<button class="btn ghost" data-copy>Copier</button><span class="spacer"></span><button class="btn ghost" data-close>Fermer</button></div></div>`;
+    document.body.appendChild(d);
+    const ta = d.querySelector("textarea"); ta.value = recapText(k);
+    d.addEventListener("click", async e => {
+      const rk = e.target.closest("[data-rk]");
+      if (rk) { d.querySelectorAll("[data-rk]").forEach(x => x.classList.toggle("on", x === rk)); ta.value = recapText(rk.dataset.rk); }
+      if (e.target.closest("[data-wa]")) window.open("https://wa.me/?text=" + encodeURIComponent(ta.value), "_blank", "noopener");
+      if (e.target.closest("[data-share]")) { try { await navigator.share({ text: ta.value }); } catch (err) {} }
+      if (e.target.closest("[data-copy]")) { try { await navigator.clipboard.writeText(ta.value); toast("Copié ✔"); } catch (err) { ta.select(); document.execCommand("copy"); toast("Copié ✔"); } }
+      if (e.target.closest("[data-close]")) d.close();
+    });
+    d.addEventListener("close", () => d.remove());
+    d.showModal();
+  }
+  document.addEventListener("click", e => { const b = e.target.closest("[data-recap]"); if (!b) return; e.preventDefault(); openRecap(b.dataset.recap); });
+
+  /* ---------- Thème & économie de batterie ---------- */
+  function ecoOn() { return document.documentElement.classList.contains("eco"); }
+  function applyTheme() {
+    const t = store.get("sev-theme", "auto"), eco = store.get("sev-eco", false), root = document.documentElement;
+    root.classList.toggle("eco", !!eco);
+    const eff = eco ? "dark" : t;
+    if (eff === "auto") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", eff);
+    const dark = eff === "dark" || (eff === "auto" && matchMedia("(prefers-color-scheme: dark)").matches);
+    const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = dark ? "#16120f" : "#b5452b";
+    document.querySelectorAll("[data-theme-set]").forEach(b => { b.classList.toggle("on", b.dataset.themeSet === t); b.disabled = !!eco; });
+    const tg = $("#ecoToggle"); if (tg) tg.checked = !!eco;
+  }
+  document.addEventListener("click", e => {
+    const b = e.target.closest("[data-theme-set]"); if (b) { store.set("sev-theme", b.dataset.themeSet); applyTheme(); }
+    if (e.target.closest("[data-eco-on]")) { store.set("sev-eco", true); applyTheme(); renderNow(); toast("🔋 Économie de batterie activée (désactivable dans Plus)", 3500); }
+  });
+  $("#ecoToggle").addEventListener("change", e => { store.set("sev-eco", e.target.checked); applyTheme(); renderNow(); toast(e.target.checked ? "🔋 Économie de batterie activée" : "Économie de batterie désactivée"); });
+  applyTheme();
+
   /* ================================================================
      Rendu global + démarrage
      ================================================================ */
@@ -1371,4 +1589,5 @@
   renderInstall();
   loadWeather();
   if (me) refresh();
+  autoLocate();
 })();
